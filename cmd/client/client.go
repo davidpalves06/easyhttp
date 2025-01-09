@@ -26,7 +26,12 @@ func main() {
 
 	buffer := make([]byte, 1024)
 	fmt.Printf("Status Code: %d\n", response.StatusCode)
-	read, _ := response.Body.Read(buffer)
-
-	fmt.Println(string(buffer[:read]))
+	if response.Body != nil {
+		read, err := response.Body.Read(buffer)
+		if err != nil {
+			fmt.Printf("%s\n", err.Error())
+		} else {
+			fmt.Println(string(buffer[:read]))
+		}
+	}
 }

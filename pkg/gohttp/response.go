@@ -27,54 +27,74 @@ func (r *HTTPResponseWriter) SetStatus(status int) {
 	r.statusCode = status
 }
 
-var reasons = map[int]string{
-	200: "OK",
-}
-
 type HTTPResponse struct {
-	Headers    Headers
+	headers    Headers
 	StatusCode int
 	Body       io.Reader
 }
 
-func (r HTTPResponse) toBytes() []byte {
+func (r *HTTPResponse) SetHeader(key string, value string) {
+	r.headers[strings.ToLower(key)] = value
+}
+
+func (r *HTTPResponse) GetHeader(key string) (string, bool) {
+	value, found := r.headers[strings.ToLower(key)]
+	return value, found
+}
+
+func (r *HTTPResponse) Headers() Headers {
+	return r.headers
+}
+
+func (r HTTPResponse) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	var reasonPhrase = reasons[r.StatusCode]
 	var statusLine = fmt.Sprintf("HTTP/1.0 %d %s\r\n", r.StatusCode, reasonPhrase)
 	buffer.WriteString(statusLine)
 
-	for headerName, headerValue := range r.Headers {
+	for headerName, headerValue := range r.headers {
 		var headerLine = fmt.Sprintf("%s: %s\r\n", headerName, headerValue)
 		buffer.WriteString(headerLine)
 	}
 
 	buffer.WriteString("\r\n")
 
-	bodyBuffer := make([]byte, 1024)
-	bodySize, err := r.Body.Read(bodyBuffer)
+	contentLengthValue, hasBody := r.GetHeader("Content-Length")
+	bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
 	if err != nil {
-		fmt.Printf("ERROR :%s\n", err.Error())
+		return nil, errors.New("content length not parsable")
 	}
 
-	buffer.Write(bodyBuffer[:bodySize])
-	return buffer.Bytes()
+	if hasBody && bodyLength != 0 {
+
+		bodyBuffer := make([]byte, 1024)
+
+		readSize, err := r.Body.Read(bodyBuffer)
+		if err != nil || readSize < int(bodyLength) {
+			return nil, errors.New("error with the request body")
+		}
+
+		buffer.Write(bodyBuffer[:bodyLength])
+	}
+
+	return buffer.Bytes(), nil
 }
 
 func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
 	var response = HTTPResponse{
-		Headers: make(Headers),
+		headers: make(Headers),
 	}
 	for headerName, headerValue := range responseWriter.headers {
-		response.Headers[headerName] = headerValue
+		response.SetHeader(headerName, headerValue)
 	}
 	response.StatusCode = responseWriter.statusCode
-	response.Headers["Content-Length"] = strconv.Itoa(responseWriter.buffer.Len())
+	response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
 	response.Body = responseWriter.buffer
 	return response
 }
 
 func parseResponseStatusLine(firstLineSplit []string, response *HTTPResponse) error {
-	if len(firstLineSplit) != 3 {
+	if len(firstLineSplit) < 3 {
 		return errors.New("incomplete Status Line")
 	}
 	var version string = firstLineSplit[0]
@@ -101,33 +121,44 @@ func parseResponseHeaders(splitedInput []string, response *HTTPResponse) uint8 {
 			break
 		}
 		headerSplit := strings.Split(line, ":")
-		response.Headers[headerSplit[0]] = strings.TrimSpace(strings.Join(headerSplit[1:], ":"))
+		response.SetHeader(headerSplit[0], strings.TrimSpace(strings.Join(headerSplit[1:], ":")))
 		headerLine += 1
 	}
 	return headerLine
 }
 
-func parseResponsefromBytes(responseBytes []byte) HTTPResponse {
-	var response = HTTPResponse{
-		Headers: make(Headers),
+func parseResponsefromBytes(responseBytes []byte) (*HTTPResponse, error) {
+	var response = &HTTPResponse{
+		headers: make(Headers),
 	}
 	bytesReader := bytes.NewReader(responseBytes)
 	buffer := make([]byte, 1024)
 	bytesRead, err := bytesReader.Read(buffer)
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
+		return nil, err
 	}
 
 	var responseString = string(buffer[:bytesRead])
 	responseString = strings.ReplaceAll(responseString, "\r\n", "\n")
 	splitedInput := strings.Split(responseString, "\n")
 	firstLineSplit := strings.Split(splitedInput[0], " ")
-	err = parseResponseStatusLine(firstLineSplit, &response)
+	err = parseResponseStatusLine(firstLineSplit, response)
 	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
+		return nil, err
 	}
 
-	headerLine := parseResponseHeaders(splitedInput, &response)
-	response.Body = bytes.NewReader([]byte(strings.Join(splitedInput[headerLine:], "\n")))
-	return response
+	headerLine := parseResponseHeaders(splitedInput, response)
+
+	contentLengthValue, hasBody := response.GetHeader("Content-Length")
+	if hasBody {
+		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil {
+			return nil, errors.New("content length is not parsable")
+		}
+		stringBody := strings.Join(splitedInput[headerLine:], "\n")
+		response.Body = bytes.NewReader([]byte(stringBody[:bodyLength]))
+	} else {
+		response.Body = nil
+	}
+	return response, nil
 }

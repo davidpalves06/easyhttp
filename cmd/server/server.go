@@ -9,8 +9,11 @@ import (
 func handleRequest(request gohttp.HTTPRequest, response *gohttp.HTTPResponseWriter) {
 	bodyBuffer := make([]byte, 1024)
 	fmt.Println("Dealing with request")
-	read, _ := request.Body.Read(bodyBuffer)
-	response.Write(bodyBuffer[:read])
+	if request.Body != nil {
+		read, _ := request.Body.Read(bodyBuffer)
+		response.Write(bodyBuffer[:read])
+	}
+	response.SetStatus(gohttp.STATUS_ACCEPTED)
 	response.SetHeader("TestHeader", "Hello")
 }
 

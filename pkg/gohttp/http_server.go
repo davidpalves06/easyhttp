@@ -41,7 +41,11 @@ func (s HTTPServer) HandleRequest(fn func(HTTPRequest, *HTTPResponseWriter)) err
 
 			var response = newHTTPResponse(*responseWriter)
 
-			connection.Write(response.toBytes())
+			responseBytes, err := response.toBytes()
+			if err != nil {
+				break
+			}
+			connection.Write(responseBytes)
 		}
 	}()
 

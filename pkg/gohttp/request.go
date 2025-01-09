@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -22,7 +23,16 @@ func (r *HTTPRequest) SetHeader(key string, value string) {
 	r.headers[strings.ToLower(key)] = value
 }
 
-func (r HTTPRequest) toBytes() []byte {
+func (r *HTTPRequest) GetHeader(key string) (string, bool) {
+	value, found := r.headers[strings.ToLower(key)]
+	return value, found
+}
+
+func (r *HTTPRequest) Headers() Headers {
+	return r.headers
+}
+
+func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 
 	var requestLine = fmt.Sprintf("%s %s HTTP/1.0\r\n", r.method, r.uri.RequestURI())
@@ -35,17 +45,27 @@ func (r HTTPRequest) toBytes() []byte {
 
 	buffer.WriteString("\r\n")
 
-	if r.method != "GET" {
+	contentLengthValue, hasBody := r.GetHeader("Content-Length")
+	bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
+	if err != nil {
+		return nil, errors.New("content length not parsable")
+	}
 
-		bodyBuffer := make([]byte, 1024)
-		bodySize, err := r.Body.Read(bodyBuffer)
-		if err != nil {
-			fmt.Printf("ERROR :%s\n", err.Error())
+	if hasBody && bodyLength != 0 {
+
+		if r.method == "GET" || r.method == "HEAD" {
+			return nil, fmt.Errorf("method %s should not have a body", r.method)
 		}
 
-		buffer.Write(bodyBuffer[:bodySize])
+		bodyBuffer := make([]byte, 1024)
+		readSize, err := r.Body.Read(bodyBuffer)
+		if err != nil || readSize < int(bodyLength) {
+			return nil, errors.New("error with the request body")
+		}
+
+		buffer.Write(bodyBuffer[:bodyLength])
 	}
-	return buffer.Bytes()
+	return buffer.Bytes(), nil
 }
 
 func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
@@ -59,6 +79,8 @@ func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
 		Body:    bytes.NewReader(body),
 		uri:     requestURI,
 	}
+
+	newRequest.SetHeader("Content-Length", strconv.Itoa(len(body)))
 	return newRequest, nil
 }
 
@@ -110,7 +132,7 @@ func parseHeaders(splitedInput []string, request *HTTPRequest) uint8 {
 			break
 		}
 		headerSplit := strings.Split(line, ":")
-		request.headers[headerSplit[0]] = strings.TrimSpace(strings.Join(headerSplit[1:], ":"))
+		request.SetHeader(headerSplit[0], strings.TrimSpace(strings.Join(headerSplit[1:], ":")))
 		headerLine += 1
 	}
 	return headerLine
@@ -130,6 +152,15 @@ func parseRequestFromBytes(buffer []byte, bytesRead int) (*HTTPRequest, error) {
 	}
 
 	headerLine := parseHeaders(splitedInput, request)
-	request.Body = bytes.NewReader([]byte(strings.Join(splitedInput[headerLine:], "\n")))
+
+	contentLengthValue, hasBody := request.GetHeader("Content-Length")
+	if hasBody {
+		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil {
+			return nil, errors.New("content length is not parsable")
+		}
+		stringBody := strings.Join(splitedInput[headerLine:], "\n")
+		request.Body = bytes.NewReader([]byte(stringBody[:bodyLength]))
+	}
 	return request, nil
 }
