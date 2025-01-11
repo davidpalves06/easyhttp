@@ -7,25 +7,30 @@ import (
 )
 
 func handleRequest(request gohttp.HTTPRequest, response *gohttp.HTTPResponseWriter) {
-	bodyBuffer := make([]byte, 1024)
 	fmt.Println("Dealing with request")
-	if request.Body != nil {
-		read, _ := request.Body.Read(bodyBuffer)
-		response.Write(bodyBuffer[:read])
-	}
+	response.Write([]byte("Hello World!\n"))
 	response.SetStatus(gohttp.STATUS_ACCEPTED)
 	response.SetHeader("TestHeader", "Hello")
 }
 
+func handleRequestTwo(request gohttp.HTTPRequest, response *gohttp.HTTPResponseWriter) {
+	fmt.Println("Dealing with request")
+	response.Write([]byte("Hello From Another Path!\n"))
+	response.SetStatus(gohttp.STATUS_OK)
+}
+
 func main() {
 	fmt.Println("Starting TCP SOCKET")
-	socket, err := gohttp.CreateHTTPServer(":1234")
+	server, err := gohttp.CreateHTTPServer(":1234")
 	if err != nil {
 		fmt.Println("Error creating socket")
 	}
 
+	server.HandleGET("/path", handleRequest)
+	server.HandleGET("/", handleRequestTwo)
 	for {
-		err := socket.HandleRequest(handleRequest)
+
+		err := server.HandleRequest()
 		if err != nil {
 			fmt.Println(err.Error())
 		}

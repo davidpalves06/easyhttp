@@ -7,11 +7,32 @@ import (
 )
 
 type HTTPServer struct {
-	address  string
-	listener net.Listener
+	address     string
+	listener    net.Listener
+	uriHandlers map[string][]*responseHandlers
 }
 
-func (s HTTPServer) HandleRequest(fn func(HTTPRequest, *HTTPResponseWriter)) error {
+type ResponseFunction func(HTTPRequest, *HTTPResponseWriter)
+
+type responseHandlers struct {
+	uriPattern string
+	handler    ResponseFunction
+}
+
+func (s HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFunction) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+
+	if currentHandlers, exists := s.uriHandlers["GET"]; exists {
+		s.uriHandlers["GET"] = append(currentHandlers, handler)
+	} else {
+		currentHandlers = make([]*responseHandlers, 0)
+		s.uriHandlers["GET"] = append(currentHandlers, handler)
+	}
+}
+
+func (s HTTPServer) HandleRequest() error {
 	connection, err := s.listener.Accept()
 	if err != nil {
 		return err
@@ -33,12 +54,28 @@ func (s HTTPServer) HandleRequest(fn func(HTTPRequest, *HTTPResponseWriter)) err
 
 			responseWriter := &HTTPResponseWriter{
 				headers:    make(map[string]string),
-				statusCode: 200,
+				statusCode: STATUS_OK,
 				buffer:     new(bytes.Buffer),
 			}
 
-			fn(*request, responseWriter)
-
+			if request.method == "GET" {
+				if handlers, exists := s.uriHandlers["GET"]; exists {
+					var handled = false
+					for _, handler := range handlers {
+						var uriPattern = handler.uriPattern
+						if isURIMatch(request.uri.Path, uriPattern) {
+							handler.handler(*request, responseWriter)
+							handled = true
+							break
+						}
+					}
+					if !handled {
+						responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+					}
+				} else {
+					responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+				}
+			}
 			var response = newHTTPResponse(*responseWriter)
 
 			responseBytes, err := response.toBytes()
@@ -63,7 +100,8 @@ func CreateHTTPServer(address string) (*HTTPServer, error) {
 		return nil, err
 	}
 	return &HTTPServer{
-		address:  address,
-		listener: listener,
+		address:     address,
+		listener:    listener,
+		uriHandlers: make(map[string][]*responseHandlers),
 	}, nil
 }

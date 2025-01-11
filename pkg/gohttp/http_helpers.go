@@ -1,5 +1,10 @@
 package gohttp
 
+import (
+	"slices"
+	"strings"
+)
+
 type Headers map[string]string
 
 const (
@@ -52,4 +57,33 @@ var reasons = map[int]string{
 	STATUS_NOT_IMPLEMENTED:     "Not Implemented",
 	STATUS_BAD_GATEWAY:         "Bad Gateway",
 	STATUS_SERVICE_UNAVAILABLE: "Service Unavailable",
+}
+
+func isEmpty(element string) bool {
+	return element == ""
+}
+
+func isURIMatch(requestPath string, pattern string) bool {
+	var requestParts = strings.Split(requestPath, "/")
+	var patternParts = strings.Split(pattern, "/")
+
+	requestParts = slices.DeleteFunc(requestParts, isEmpty)
+	patternParts = slices.DeleteFunc(patternParts, isEmpty)
+
+	if len(requestParts) < len(patternParts) {
+		return false
+	}
+
+	var j = 0
+	for i, part := range patternParts {
+		if part == requestParts[j] {
+			j += 1
+		} else if part == "*" {
+			j = len(requestParts) - (len(patternParts) - (i + 1))
+		} else if part != requestParts[j] {
+			return false
+		}
+	}
+
+	return j == len(requestParts)
 }

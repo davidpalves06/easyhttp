@@ -150,15 +150,17 @@ func parseResponsefromBytes(responseBytes []byte) (*HTTPResponse, error) {
 	headerLine := parseResponseHeaders(splitedInput, response)
 
 	contentLengthValue, hasBody := response.GetHeader("Content-Length")
-	if hasBody {
-		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
-		if err != nil {
-			return nil, errors.New("content length is not parsable")
-		}
+	bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
+	if err != nil {
+		return nil, errors.New("content length is not parsable")
+	}
+
+	if hasBody && bodyLength != 0 {
 		stringBody := strings.Join(splitedInput[headerLine:], "\n")
 		response.Body = bytes.NewReader([]byte(stringBody[:bodyLength]))
 	} else {
 		response.Body = nil
 	}
+
 	return response, nil
 }

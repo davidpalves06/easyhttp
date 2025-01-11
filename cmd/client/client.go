@@ -8,8 +8,8 @@ import (
 
 func main() {
 
-	body := "name=FirstName%20LastName&email=bsmth%40example.com"
-	request, err := gohttp.NewRequestWithBody("http://localhost:1234/path", []byte(body))
+	// body := "name=FirstName%20LastName&email=bsmth%40example.com"
+	request, err := gohttp.NewRequest("http://localhost:1234/path/resource")
 	request.SetHeader("Host", "example.com")
 	request.SetHeader("Content-Type", "text/html")
 
@@ -18,7 +18,7 @@ func main() {
 		return
 	}
 
-	response, err := gohttp.POST(request)
+	response, err := gohttp.GET(request)
 	if err != nil {
 		fmt.Println(err.Error())
 		return

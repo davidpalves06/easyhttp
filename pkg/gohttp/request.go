@@ -46,12 +46,12 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer.WriteString("\r\n")
 
 	contentLengthValue, hasBody := r.GetHeader("Content-Length")
-	bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
-	if err != nil {
-		return nil, errors.New("content length not parsable")
-	}
 
-	if hasBody && bodyLength != 0 {
+	if hasBody {
+		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil || bodyLength == 0 {
+			return nil, errors.New("content length is not valid")
+		}
 
 		if r.method == "GET" || r.method == "HEAD" {
 			return nil, fmt.Errorf("method %s should not have a body", r.method)
