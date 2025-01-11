@@ -116,7 +116,7 @@ func parseRequestLine(firstLineSplit []string, request *HTTPRequest) error {
 
 	var version = firstLineSplit[2]
 	versionSplit := strings.Split(version, "/")
-	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || versionSplit[1] != "1.0" {
+	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || !slices.Contains(validVersions, versionSplit[1]) {
 		return errors.New("invalid HTTP Version")
 	}
 	request.version = versionSplit[1]

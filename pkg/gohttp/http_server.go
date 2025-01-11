@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"sync"
 )
 
 type HTTPServer struct {
 	address     string
 	listener    net.Listener
 	uriHandlers map[string][]*responseHandlers
+	running     bool
+	waitGroup   sync.WaitGroup
 }
 
 type ResponseFunction func(HTTPRequest, *HTTPResponseWriter)
@@ -19,82 +22,107 @@ type responseHandlers struct {
 	handler    ResponseFunction
 }
 
-func (s HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFunction) {
+func (s *HTTPServer) addHandlerForMethod(handler *responseHandlers, method string) {
+
+	if currentHandlers, exists := s.uriHandlers[method]; exists {
+		s.uriHandlers[method] = append(currentHandlers, handler)
+	} else {
+		currentHandlers = make([]*responseHandlers, 0)
+		s.uriHandlers[method] = append(currentHandlers, handler)
+	}
+}
+
+func (s *HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFunction) {
 	var handler *responseHandlers = new(responseHandlers)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 
-	if currentHandlers, exists := s.uriHandlers["GET"]; exists {
-		s.uriHandlers["GET"] = append(currentHandlers, handler)
-	} else {
-		currentHandlers = make([]*responseHandlers, 0)
-		s.uriHandlers["GET"] = append(currentHandlers, handler)
-	}
+	s.addHandlerForMethod(handler, MethodGet)
 }
 
-func (s HTTPServer) HandleRequest() error {
-	connection, err := s.listener.Accept()
+func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunction) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+
+	s.addHandlerForMethod(handler, MethodPost)
+}
+
+func HandleConnection(connection net.Conn, server *HTTPServer) {
+	var buffer []byte = make([]byte, 2048)
+	defer connection.Close()
+	defer server.waitGroup.Done()
+	// for server.running {
+	bytesRead, err := connection.Read(buffer)
+	if err != nil || bytesRead == 0 {
+		// break
+		return
+	}
+
+	request, err := parseRequestFromBytes(buffer, bytesRead)
 	if err != nil {
-		return err
+		fmt.Println(err.Error())
+		// break
+		return
 	}
-	go func() {
-		var buffer []byte = make([]byte, 2048)
-		defer connection.Close()
-		for {
-			bytesRead, err := connection.Read(buffer)
-			if err != nil || bytesRead == 0 {
+
+	responseWriter := &HTTPResponseWriter{
+		headers:    make(map[string]string),
+		statusCode: STATUS_OK,
+		buffer:     new(bytes.Buffer),
+	}
+
+	if handlers, exists := server.uriHandlers[request.method]; exists {
+		var handled = false
+		for _, handler := range handlers {
+			var uriPattern = handler.uriPattern
+			if isURIMatch(request.uri.Path, uriPattern) {
+				handler.handler(*request, responseWriter)
+				handled = true
 				break
 			}
-
-			request, err := parseRequestFromBytes(buffer, bytesRead)
-			if err != nil {
-				fmt.Println(err.Error())
-				break
-			}
-
-			responseWriter := &HTTPResponseWriter{
-				headers:    make(map[string]string),
-				statusCode: STATUS_OK,
-				buffer:     new(bytes.Buffer),
-			}
-
-			if request.method == "GET" {
-				if handlers, exists := s.uriHandlers["GET"]; exists {
-					var handled = false
-					for _, handler := range handlers {
-						var uriPattern = handler.uriPattern
-						if isURIMatch(request.uri.Path, uriPattern) {
-							handler.handler(*request, responseWriter)
-							handled = true
-							break
-						}
-					}
-					if !handled {
-						responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
-					}
-				} else {
-					responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
-				}
-			}
-			var response = newHTTPResponse(*responseWriter)
-
-			responseBytes, err := response.toBytes()
-			if err != nil {
-				break
-			}
-			connection.Write(responseBytes)
 		}
-	}()
+		if !handled {
+			responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+		}
+	} else {
+		responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+	}
+	var response = newHTTPResponse(*responseWriter)
 
-	return nil
+	responseBytes, err := response.toBytes()
+	if err != nil {
+		// break
+		return
+	}
+	connection.Write(responseBytes)
+	// }
 }
 
-func (s HTTPServer) Close() error {
+func (s HTTPServer) AcceptConnection() (net.Conn, error) {
+	return s.listener.Accept()
+}
+
+func (s *HTTPServer) Run() {
+	s.running = true
+	for s.running {
+		connection, err := s.AcceptConnection()
+		if err != nil {
+			break
+		}
+		s.waitGroup.Add(1)
+		go HandleConnection(connection, s)
+	}
+}
+
+func (s *HTTPServer) Close() error {
+	s.running = false
 	err := s.listener.Close()
+	s.waitGroup.Wait()
 	return err
 }
 
-func CreateHTTPServer(address string) (*HTTPServer, error) {
+func NewHTTPServer(address string) (*HTTPServer, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return nil, err

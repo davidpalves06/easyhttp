@@ -20,6 +20,7 @@ const (
 )
 
 var validMethods = []string{"GET", "HEAD", "POST"}
+var validVersions = []string{"1.0", "1.1", "2.0"}
 
 const (
 	STATUS_OK                  = 200

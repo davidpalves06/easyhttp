@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
 
 	"github.com/davidpalves06/WebSocket/pkg/gohttp"
 )
@@ -20,21 +23,25 @@ func handleRequestTwo(request gohttp.HTTPRequest, response *gohttp.HTTPResponseW
 }
 
 func main() {
-	fmt.Println("Starting TCP SOCKET")
-	server, err := gohttp.CreateHTTPServer(":1234")
+	server, err := gohttp.NewHTTPServer(":1234")
 	if err != nil {
-		fmt.Println("Error creating socket")
+		fmt.Println("Error creating HTTP Server")
+		return
 	}
 
 	server.HandleGET("/path", handleRequest)
+	server.HandlePOST("/path", handleRequest)
 	server.HandleGET("/", handleRequestTwo)
-	for {
 
-		err := server.HandleRequest()
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		fmt.Println("TCP connection accepted")
-	}
+	go func() {
+		log.Println("Starting server")
+		server.Run()
+	}()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
+	<-sigChan
+	server.Close()
 
 }
