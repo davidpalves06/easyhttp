@@ -13,10 +13,10 @@ func handleRequest(request HTTPRequest, response *HTTPResponseWriter) {
 	response.Write([]byte("Hello World!\n"))
 }
 
-func setupSuite(tb testing.TB) func(tb testing.TB) {
+func setupServerSuite(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
-		tb.Errorf("Error creating HTTP Server")
+		tb.Fatalf("Error creating HTTP Server")
 	}
 
 	server.HandleGET("/path", handleRequest)
@@ -34,7 +34,7 @@ func setupSuite(tb testing.TB) func(tb testing.TB) {
 	}
 }
 func TestServerGet(t *testing.T) {
-	tearDown := setupSuite(t)
+	tearDown := setupServerSuite(t)
 	defer tearDown(t)
 
 	response, err := http.Get("http://localhost:1234/path")
@@ -63,10 +63,18 @@ func TestServerGet(t *testing.T) {
 		t.FailNow()
 	}
 
+	response, err = http.Get("http://localhost:1234/resource")
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
+		t.FailNow()
+	}
+
 }
 
 func TestServerPost(t *testing.T) {
-	tearDown := setupSuite(t)
+	tearDown := setupServerSuite(t)
 	defer tearDown(t)
 
 	bodyBuffer := make([]byte, 1024)
