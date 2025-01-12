@@ -35,8 +35,10 @@ func (r *HTTPRequest) Headers() Headers {
 func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 
-	var requestLine = fmt.Sprintf("%s %s HTTP/1.0\r\n", r.method, r.uri.RequestURI())
+	var requestLine = fmt.Sprintf("%s %s HTTP/%s\r\n", r.method, r.uri.RequestURI(), r.version)
 	buffer.WriteString(requestLine)
+
+	r.headers["User-Agent"] = softwareName
 
 	for headerName, headerValue := range r.headers {
 		var headerLine = fmt.Sprintf("%s: %s\r\n", headerName, headerValue)
@@ -73,14 +75,18 @@ func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
 	if err != nil {
 		return HTTPRequest{}, errors.New("uri is not valid")
 	}
+
 	newRequest := HTTPRequest{
 		headers: make(Headers),
-		version: "HTTP/1.0",
+		version: "1.0",
 		Body:    bytes.NewReader(body),
 		uri:     requestURI,
 	}
 
-	newRequest.SetHeader("Content-Length", strconv.Itoa(len(body)))
+	if len(body) > 0 {
+		newRequest.SetHeader("Content-Length", strconv.Itoa(len(body)))
+		newRequest.SetHeader("Content-Type", "text/plain")
+	}
 	return newRequest, nil
 }
 
@@ -91,7 +97,7 @@ func NewRequest(uri string) (HTTPRequest, error) {
 	}
 	newRequest := HTTPRequest{
 		headers: make(Headers),
-		version: "HTTP/1.0",
+		version: "1.0",
 		uri:     requestURI,
 	}
 	return newRequest, nil

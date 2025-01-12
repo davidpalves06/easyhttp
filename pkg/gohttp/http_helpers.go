@@ -7,6 +7,8 @@ import (
 
 type Headers map[string]string
 
+const softwareName = "GoHTTP 1.0"
+
 const (
 	MethodGet     = "GET"
 	MethodHead    = "HEAD"

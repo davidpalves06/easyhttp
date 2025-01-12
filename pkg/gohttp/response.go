@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type HTTPResponseWriter struct {
@@ -60,12 +62,12 @@ func (r HTTPResponse) toBytes() ([]byte, error) {
 	buffer.WriteString("\r\n")
 
 	contentLengthValue, hasBody := r.GetHeader("Content-Length")
-	bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
-	if err != nil {
-		return nil, errors.New("content length not parsable")
-	}
 
-	if hasBody && bodyLength != 0 {
+	if hasBody {
+		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil || bodyLength == 0 {
+			return nil, errors.New("content length not valid")
+		}
 
 		bodyBuffer := make([]byte, 1024)
 
@@ -84,11 +86,26 @@ func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
 	var response = HTTPResponse{
 		headers: make(Headers),
 	}
+
+	if responseWriter.buffer.Len() > 0 {
+		response.SetHeader("Content-Type", "text/plain")
+		response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
+	}
+
+	response.SetHeader("Date", time.Now().UTC().Format(time.RFC1123))
+	response.SetHeader("Server", softwareName)
+
+	if responseWriter.statusCode == STATUS_UNAUTHORIZED {
+		if _, exists := responseWriter.headers["WWW-Authenticate"]; !exists {
+			log.Printf("Warning : Status 401 has no WWW-Authenticate header\n")
+		}
+	}
+
 	for headerName, headerValue := range responseWriter.headers {
 		response.SetHeader(headerName, headerValue)
 	}
+
 	response.StatusCode = responseWriter.statusCode
-	response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
 	response.Body = responseWriter.buffer
 	return response
 }

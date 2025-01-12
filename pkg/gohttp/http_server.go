@@ -2,7 +2,7 @@ package gohttp
 
 import (
 	"bytes"
-	"fmt"
+	"log"
 	"net"
 	"sync"
 )
@@ -61,7 +61,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 
 	request, err := parseRequestFromBytes(buffer, bytesRead)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		// break
 		return
 	}
@@ -99,7 +99,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	// }
 }
 
-func (s HTTPServer) AcceptConnection() (net.Conn, error) {
+func (s *HTTPServer) AcceptConnection() (net.Conn, error) {
 	return s.listener.Accept()
 }
 

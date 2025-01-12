@@ -39,7 +39,7 @@ func TestServerGet(t *testing.T) {
 
 	response, err := http.Get("http://localhost:1234/path")
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
 	if response.StatusCode != STATUS_OK || response.Header.Get("TestHeader") != "Hello" {
 		t.FailNow()
@@ -53,7 +53,7 @@ func TestServerGet(t *testing.T) {
 
 	response, err = http.Get("http://localhost:1234/")
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
 	if response.StatusCode != STATUS_OK || response.Header.Get("TestHeader") != "Hello" {
 		t.FailNow()
@@ -65,7 +65,7 @@ func TestServerGet(t *testing.T) {
 
 	response, err = http.Get("http://localhost:1234/resource")
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
 	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
 		t.FailNow()
