@@ -72,5 +72,27 @@ func TestVersion(t *testing.T) {
 	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
 		t.FailNow()
 	}
+}
+
+func TestHeadRequests(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+
+	request, err := NewRequest("http://localhost:1234/path")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	response, err := HEAD(request)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	headerValue, exists := response.GetHeader("TestHeader")
+	if response.StatusCode != STATUS_OK || !exists || headerValue != "Hello" {
+		t.FailNow()
+	}
+	if response.Body != nil {
+		t.Fatalf("Body is not empty\n")
+	}
 
 }

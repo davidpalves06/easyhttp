@@ -38,6 +38,7 @@ func (s *HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFuncti
 	handler.handler = handlerFunction
 
 	s.addHandlerForMethod(handler, MethodGet)
+	s.addHandlerForMethod(handler, MethodHead)
 }
 
 func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunction) {
@@ -88,9 +89,12 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	} else {
 		responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
 	}
+
+	if request.method == MethodHead {
+		responseWriter.buffer = nil
+	}
 	var response = newHTTPResponse(*responseWriter)
 	response.version = request.version
-
 	responseBytes, err := response.toBytes()
 	if err != nil {
 		// break

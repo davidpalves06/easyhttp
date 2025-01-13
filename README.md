@@ -1,9 +1,6 @@
 # WebSocket
 Go Web Socket implementation as defined in protocol RFC 6455.
 
-//TODO: HEAD REQUESTS
-
-
 //TODO:Implement chunked transfer encoding if dealing with large responses.
 
 //TODO:Content Serving:

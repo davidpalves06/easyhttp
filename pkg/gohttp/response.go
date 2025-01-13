@@ -89,7 +89,7 @@ func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
 		headers: make(Headers),
 	}
 
-	if responseWriter.buffer.Len() > 0 {
+	if responseWriter.buffer != nil && responseWriter.buffer.Len() > 0 {
 		response.SetHeader("Content-Type", "text/plain")
 		response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
 	}

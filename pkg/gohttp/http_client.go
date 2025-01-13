@@ -10,6 +10,11 @@ func GET(request HTTPRequest) (*HTTPResponse, error) {
 	return makeRequest(request)
 }
 
+func HEAD(request HTTPRequest) (*HTTPResponse, error) {
+	request.method = MethodHead
+	return makeRequest(request)
+}
+
 func POST(request HTTPRequest) (*HTTPResponse, error) {
 	request.method = MethodPost
 	return makeRequest(request)
