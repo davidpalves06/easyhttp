@@ -13,7 +13,7 @@ func handleRequest(request HTTPRequest, response *HTTPResponseWriter) {
 	response.Write([]byte("Hello World!\n"))
 }
 
-func setupServerSuite(tb testing.TB) func(tb testing.TB) {
+func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
 		tb.Fatalf("Error creating HTTP Server")
@@ -34,7 +34,7 @@ func setupServerSuite(tb testing.TB) func(tb testing.TB) {
 	}
 }
 func TestServerGet(t *testing.T) {
-	tearDown := setupServerSuite(t)
+	tearDown := setupServer(t)
 	defer tearDown(t)
 
 	response, err := http.Get("http://localhost:1234/path")
@@ -74,7 +74,7 @@ func TestServerGet(t *testing.T) {
 }
 
 func TestServerPost(t *testing.T) {
-	tearDown := setupServerSuite(t)
+	tearDown := setupServer(t)
 	defer tearDown(t)
 
 	bodyBuffer := make([]byte, 1024)

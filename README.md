@@ -1,7 +1,6 @@
 # WebSocket
 Go Web Socket implementation as defined in protocol RFC 6455.
 
-//TODO:HTTP VERSION FROM RESPONSE SAME AS REQUEST
 //TODO: HEAD REQUESTS
 
 

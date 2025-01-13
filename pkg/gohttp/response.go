@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,7 @@ func (r *HTTPResponseWriter) SetStatus(status int) {
 
 type HTTPResponse struct {
 	headers    Headers
+	version    string
 	StatusCode int
 	Body       io.Reader
 }
@@ -51,7 +53,7 @@ func (r *HTTPResponse) Headers() Headers {
 func (r HTTPResponse) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	var reasonPhrase = reasons[r.StatusCode]
-	var statusLine = fmt.Sprintf("HTTP/1.0 %d %s\r\n", r.StatusCode, reasonPhrase)
+	var statusLine = fmt.Sprintf("HTTP/%s %d %s\r\n", r.version, r.StatusCode, reasonPhrase)
 	buffer.WriteString(statusLine)
 
 	for headerName, headerValue := range r.headers {
@@ -116,9 +118,11 @@ func parseResponseStatusLine(firstLineSplit []string, response *HTTPResponse) er
 	}
 	var version string = firstLineSplit[0]
 	versionSplit := strings.Split(version, "/")
-	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || versionSplit[1] != "1.0" {
+	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || !slices.Contains(validVersions, versionSplit[1]) {
 		return errors.New("invalid HTTP Version")
 	}
+
+	response.version = versionSplit[1]
 
 	var statusCode = firstLineSplit[1]
 	parsedStatus, err := strconv.ParseInt(statusCode, 10, 16)
@@ -167,12 +171,12 @@ func parseResponsefromBytes(responseBytes []byte) (*HTTPResponse, error) {
 	headerLine := parseResponseHeaders(splitedInput, response)
 
 	contentLengthValue, hasBody := response.GetHeader("Content-Length")
-	bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
-	if err != nil {
-		return nil, errors.New("content length is not parsable")
-	}
 
-	if hasBody && bodyLength != 0 {
+	if hasBody {
+		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil || bodyLength == 0 {
+			return nil, errors.New("content length is not valid")
+		}
 		stringBody := strings.Join(splitedInput[headerLine:], "\n")
 		response.Body = bytes.NewReader([]byte(stringBody[:bodyLength]))
 	} else {

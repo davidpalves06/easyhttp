@@ -89,6 +89,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
 	}
 	var response = newHTTPResponse(*responseWriter)
+	response.version = request.version
 
 	responseBytes, err := response.toBytes()
 	if err != nil {
