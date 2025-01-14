@@ -1,5 +1,5 @@
 # WebSocket
-Go Web Socket implementation as defined in protocol RFC 6455.
+Go HTTP implementation as defined in protocol RFC 2616.
 
 //TODO:Implement chunked transfer encoding if dealing with large responses.
 
@@ -20,3 +20,4 @@ Go Web Socket implementation as defined in protocol RFC 6455.
     Consider HTTPS support (this would involve setting up SSL/TLS).
 //TODO:Performance Tuning:
     Optimize for speed
+//TODO: Shutdown timeout

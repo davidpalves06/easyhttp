@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"net/url"
 	"slices"
 	"strconv"
@@ -34,7 +36,6 @@ func (r *HTTPRequest) Headers() Headers {
 
 func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
-
 	var requestLine = fmt.Sprintf("%s %s HTTP/%s\r\n", r.method, r.uri.RequestURI(), r.version)
 	buffer.WriteString(requestLine)
 
@@ -59,13 +60,20 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 			return nil, fmt.Errorf("method %s should not have a body", r.method)
 		}
 
-		bodyBuffer := make([]byte, 1024)
-		readSize, err := r.Body.Read(bodyBuffer)
-		if err != nil || readSize < int(bodyLength) {
-			return nil, errors.New("error with the request body")
+		bodyBuffer := make([]byte, 2048)
+		var readSize int64
+
+		for readSize < bodyLength {
+			read, err := r.Body.Read(bodyBuffer)
+			if err != nil && err != io.EOF {
+				return nil, errors.New("error with the request body")
+			}
+
+			read = int(math.Min(float64(bodyLength-readSize), float64(read)))
+			buffer.Write(bodyBuffer[:read])
+			readSize += int64(read)
 		}
 
-		buffer.Write(bodyBuffer[:bodyLength])
 	}
 	return buffer.Bytes(), nil
 }
@@ -144,15 +152,22 @@ func parseHeaders(splitedInput []string, request *HTTPRequest) uint8 {
 	return headerLine
 }
 
-func parseRequestFromBytes(buffer []byte, bytesRead int) (*HTTPRequest, error) {
-	var requestString = string(buffer[:bytesRead])
-	requestString = strings.ReplaceAll(requestString, "\r\n", "\n")
-	splitedInput := strings.Split(requestString, "\n")
-	firstLineSplit := strings.Split(splitedInput[0], " ")
+func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
+	var buffer []byte = make([]byte, 2048)
+	bytesRead, err := connection.Read(buffer)
+	if err != nil || bytesRead == 0 {
+		return nil, err
+	}
 	var request *HTTPRequest = &HTTPRequest{
 		headers: make(map[string]string),
 	}
-	err := parseRequestLine(firstLineSplit, request)
+
+	var requestString = string(buffer[:bytesRead])
+	splitedInput := strings.Split(requestString, "\r\n")
+
+	firstLineSplit := strings.Split(splitedInput[0], " ")
+
+	err = parseRequestLine(firstLineSplit, request)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +180,30 @@ func parseRequestFromBytes(buffer []byte, bytesRead int) (*HTTPRequest, error) {
 		if err != nil {
 			return nil, errors.New("content length is not parsable")
 		}
-		stringBody := strings.Join(splitedInput[headerLine:], "\n")
-		request.Body = bytes.NewReader([]byte(stringBody[:bodyLength]))
+
+		stringBody := strings.Join(splitedInput[headerLine:], "\r\n")
+
+		var bodyBuffer *bytes.Buffer = new(bytes.Buffer)
+		if int(bodyLength) > len(stringBody) {
+
+			var readSize int = len(stringBody)
+			bodyBuffer.Write([]byte(stringBody))
+			for readSize < int(bodyLength) {
+				read, err := connection.Read(buffer)
+				if (err != nil && err != io.EOF) || read == 0 {
+					return nil, errors.New("error with the request body")
+				}
+
+				read = int(math.Min(float64(bodyLength-int64(readSize)), float64(read)))
+				bodyBuffer.Write(buffer[:read])
+				readSize += read
+			}
+		} else {
+			bodyBuffer.Write([]byte(stringBody[:bodyLength]))
+		}
+
+		request.Body = bodyBuffer
+
 	}
 	return request, nil
 }

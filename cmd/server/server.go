@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -11,7 +12,18 @@ import (
 
 func handleRequest(request gohttp.HTTPRequest, response *gohttp.HTTPResponseWriter) {
 	fmt.Println("Dealing with request")
-	response.Write([]byte("Hello World!\n"))
+	bodyBuffer := make([]byte, 1024)
+	buffer := new(bytes.Buffer)
+	var totalRead int
+	for {
+		read, err := request.Body.Read(bodyBuffer)
+		if err != nil {
+			break
+		}
+		buffer.Write(bodyBuffer)
+		totalRead += read
+	}
+	response.Write(buffer.Bytes()[:totalRead])
 	response.SetStatus(gohttp.STATUS_ACCEPTED)
 	response.SetHeader("TestHeader", "Hello")
 }

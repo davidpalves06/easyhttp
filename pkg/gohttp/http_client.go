@@ -28,24 +28,21 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 		}
 		request.uri.Host = host
 	}
-	tcpConn, err := net.Dial("tcp", request.uri.Host)
+	connection, err := net.Dial("tcp", request.uri.Host)
 	if err != nil {
 		return nil, err
 	}
-	defer tcpConn.Close()
+	defer connection.Close()
 
 	requestBytes, err := request.toBytes()
 	if err != nil {
 		return nil, err
 	}
-	_, err = tcpConn.Write(requestBytes)
+	_, err = connection.Write(requestBytes)
 	if err != nil {
 		return nil, err
 	}
-
-	var buffer []byte = make([]byte, 1024)
-	read, _ := tcpConn.Read(buffer)
-	response, err := parseResponsefromBytes(buffer[:read])
+	response, err := parseResponsefromConnection(connection)
 	if err != nil {
 		return nil, err
 	}

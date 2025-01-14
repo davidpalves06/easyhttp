@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
+	"net"
 	"slices"
 	"strconv"
 	"strings"
@@ -71,14 +73,19 @@ func (r HTTPResponse) toBytes() ([]byte, error) {
 			return nil, errors.New("content length not valid")
 		}
 
-		bodyBuffer := make([]byte, 1024)
+		bodyBuffer := make([]byte, 2048)
+		var readSize int64
 
-		readSize, err := r.Body.Read(bodyBuffer)
-		if err != nil || readSize < int(bodyLength) {
-			return nil, errors.New("error with the request body")
+		for readSize < bodyLength {
+			read, err := r.Body.Read(bodyBuffer)
+			if err != nil && err != io.EOF {
+				return nil, errors.New("error with the request body")
+			}
+
+			read = int(math.Min(float64(bodyLength-readSize), float64(read)))
+			buffer.Write(bodyBuffer[:read])
+			readSize += int64(read)
 		}
-
-		buffer.Write(bodyBuffer[:bodyLength])
 	}
 
 	return buffer.Bytes(), nil
@@ -148,20 +155,18 @@ func parseResponseHeaders(splitedInput []string, response *HTTPResponse) uint8 {
 	return headerLine
 }
 
-func parseResponsefromBytes(responseBytes []byte) (*HTTPResponse, error) {
+func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 	var response = &HTTPResponse{
 		headers: make(Headers),
 	}
-	bytesReader := bytes.NewReader(responseBytes)
-	buffer := make([]byte, 1024)
-	bytesRead, err := bytesReader.Read(buffer)
+	var buffer []byte = make([]byte, 2048)
+	bytesRead, err := connection.Read(buffer)
 	if err != nil {
 		return nil, err
 	}
 
 	var responseString = string(buffer[:bytesRead])
-	responseString = strings.ReplaceAll(responseString, "\r\n", "\n")
-	splitedInput := strings.Split(responseString, "\n")
+	splitedInput := strings.Split(responseString, "\r\n")
 	firstLineSplit := strings.Split(splitedInput[0], " ")
 	err = parseResponseStatusLine(firstLineSplit, response)
 	if err != nil {
@@ -177,8 +182,29 @@ func parseResponsefromBytes(responseBytes []byte) (*HTTPResponse, error) {
 		if err != nil || bodyLength == 0 {
 			return nil, errors.New("content length is not valid")
 		}
-		stringBody := strings.Join(splitedInput[headerLine:], "\n")
-		response.Body = bytes.NewReader([]byte(stringBody[:bodyLength]))
+		stringBody := strings.Join(splitedInput[headerLine:], "\r\n")
+
+		var bodyBuffer *bytes.Buffer = new(bytes.Buffer)
+
+		if int(bodyLength) > len(stringBody) {
+			var readSize int = len(stringBody)
+			bodyBuffer.Write([]byte(stringBody[:readSize]))
+
+			for readSize < int(bodyLength) {
+				read, err := connection.Read(buffer)
+				if err != nil && err != io.EOF {
+					return nil, errors.New("error with the request body")
+				}
+
+				read = int(math.Min(float64(bodyLength-int64(readSize)), float64(read)))
+				bodyBuffer.Write(buffer[:read])
+				readSize += read
+			}
+		} else {
+			bodyBuffer.Write([]byte(stringBody[:bodyLength]))
+		}
+
+		response.Body = bodyBuffer
 	} else {
 		response.Body = nil
 	}

@@ -50,17 +50,11 @@ func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunct
 }
 
 func HandleConnection(connection net.Conn, server *HTTPServer) {
-	var buffer []byte = make([]byte, 2048)
 	defer connection.Close()
 	defer server.waitGroup.Done()
 	// for server.running {
-	bytesRead, err := connection.Read(buffer)
-	if err != nil || bytesRead == 0 {
-		// break
-		return
-	}
 
-	request, err := parseRequestFromBytes(buffer, bytesRead)
+	request, err := parseRequestFromConnection(connection)
 	if err != nil {
 		log.Println(err.Error())
 		// break

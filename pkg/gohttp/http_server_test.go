@@ -13,6 +13,23 @@ func handleRequest(request HTTPRequest, response *HTTPResponseWriter) {
 	response.Write([]byte("Hello World!\n"))
 }
 
+func handleEcho(request HTTPRequest, response *HTTPResponseWriter) {
+	bodyBuffer := make([]byte, 1024)
+	buffer := new(bytes.Buffer)
+	var totalRead int
+	for {
+		read, err := request.Body.Read(bodyBuffer)
+		if err != nil {
+			break
+		}
+		buffer.Write(bodyBuffer)
+		totalRead += read
+	}
+	response.Write(buffer.Bytes()[:totalRead])
+	response.SetStatus(STATUS_OK)
+	response.SetHeader("TestHeader", "Hello")
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
@@ -22,6 +39,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandleGET("/path", handleRequest)
 	server.HandleGET("/", handleRequest)
 	server.HandlePOST("/resource", handleRequest)
+	server.HandlePOST("/large", handleEcho)
 	go func() {
 		log.Println("Starting")
 		server.Run()
