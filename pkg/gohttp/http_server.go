@@ -2,7 +2,6 @@ package gohttp
 
 import (
 	"bytes"
-	"log"
 	"net"
 	"sync"
 )
@@ -53,11 +52,14 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	defer connection.Close()
 	defer server.waitGroup.Done()
 	// for server.running {
-
 	request, err := parseRequestFromConnection(connection)
 	if err != nil {
-		log.Println(err.Error())
-		// break
+		badRequestResponse := HTTPResponse{
+			version:    "1.0",
+			StatusCode: 400,
+		}
+		responseBytes, _ := badRequestResponse.toBytes()
+		connection.Write(responseBytes)
 		return
 	}
 

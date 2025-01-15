@@ -96,11 +96,6 @@ func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
 		headers: make(Headers),
 	}
 
-	if responseWriter.buffer != nil && responseWriter.buffer.Len() > 0 {
-		response.SetHeader("Content-Type", "text/plain")
-		response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
-	}
-
 	response.SetHeader("Date", time.Now().UTC().Format(time.RFC1123))
 	response.SetHeader("Server", softwareName)
 
@@ -112,6 +107,11 @@ func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
 
 	for headerName, headerValue := range responseWriter.headers {
 		response.SetHeader(headerName, headerValue)
+	}
+
+	if responseWriter.buffer != nil && responseWriter.buffer.Len() > 0 {
+		response.SetHeader("Content-Type", "text/plain")
+		response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
 	}
 
 	response.StatusCode = responseWriter.statusCode
@@ -162,6 +162,7 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 	var buffer []byte = make([]byte, 2048)
 	bytesRead, err := connection.Read(buffer)
 	if err != nil {
+		log.Println("Failed to read response", err)
 		return nil, err
 	}
 

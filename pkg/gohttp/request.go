@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type HTTPRequest struct {
@@ -18,7 +19,7 @@ type HTTPRequest struct {
 	uri     *url.URL
 	version string
 	headers Headers
-	Body    io.Reader
+	Body    []byte
 }
 
 func (r *HTTPRequest) SetHeader(key string, value string) {
@@ -38,6 +39,7 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	var requestLine = fmt.Sprintf("%s %s HTTP/%s\r\n", r.method, r.uri.RequestURI(), r.version)
 	buffer.WriteString(requestLine)
+	r.SetHeader("Content-Length", strconv.Itoa(len(r.Body)))
 
 	r.headers["User-Agent"] = softwareName
 
@@ -48,11 +50,9 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 
 	buffer.WriteString("\r\n")
 
-	contentLengthValue, hasBody := r.GetHeader("Content-Length")
-
-	if hasBody {
-		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
-		if err != nil || bodyLength == 0 {
+	if r.Body != nil {
+		bodyLength := len(r.Body)
+		if bodyLength == 0 {
 			return nil, errors.New("content length is not valid")
 		}
 
@@ -60,19 +60,7 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 			return nil, fmt.Errorf("method %s should not have a body", r.method)
 		}
 
-		bodyBuffer := make([]byte, 2048)
-		var readSize int64
-
-		for readSize < bodyLength {
-			read, err := r.Body.Read(bodyBuffer)
-			if err != nil && err != io.EOF {
-				return nil, errors.New("error with the request body")
-			}
-
-			read = int(math.Min(float64(bodyLength-readSize), float64(read)))
-			buffer.Write(bodyBuffer[:read])
-			readSize += int64(read)
-		}
+		buffer.Write(r.Body[:bodyLength])
 
 	}
 	return buffer.Bytes(), nil
@@ -87,7 +75,7 @@ func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
 	newRequest := HTTPRequest{
 		headers: make(Headers),
 		version: "1.0",
-		Body:    bytes.NewReader(body),
+		Body:    body,
 		uri:     requestURI,
 	}
 
@@ -106,6 +94,7 @@ func NewRequest(uri string) (HTTPRequest, error) {
 	newRequest := HTTPRequest{
 		headers: make(Headers),
 		version: "1.0",
+		Body:    nil,
 		uri:     requestURI,
 	}
 	return newRequest, nil
@@ -154,6 +143,7 @@ func parseHeaders(splitedInput []string, request *HTTPRequest) uint8 {
 
 func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 	var buffer []byte = make([]byte, 2048)
+	connection.SetReadDeadline(time.Now().Add(5 * time.Second))
 	bytesRead, err := connection.Read(buffer)
 	if err != nil || bytesRead == 0 {
 		return nil, err
@@ -189,6 +179,7 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 			var readSize int = len(stringBody)
 			bodyBuffer.Write([]byte(stringBody))
 			for readSize < int(bodyLength) {
+				connection.SetReadDeadline(time.Now().Add(5 * time.Second))
 				read, err := connection.Read(buffer)
 				if (err != nil && err != io.EOF) || read == 0 {
 					return nil, errors.New("error with the request body")
@@ -202,7 +193,7 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 			bodyBuffer.Write([]byte(stringBody[:bodyLength]))
 		}
 
-		request.Body = bodyBuffer
+		request.Body = bodyBuffer.Bytes()
 
 	}
 	return request, nil

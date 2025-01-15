@@ -14,9 +14,10 @@ func handleRequest(request gohttp.HTTPRequest, response *gohttp.HTTPResponseWrit
 	fmt.Println("Dealing with request")
 	bodyBuffer := make([]byte, 1024)
 	buffer := new(bytes.Buffer)
+	bodyReader := bytes.NewReader(request.Body)
 	var totalRead int
 	for {
-		read, err := request.Body.Read(bodyBuffer)
+		read, err := bodyReader.Read(bodyBuffer)
 		if err != nil {
 			break
 		}
