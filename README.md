@@ -1,7 +1,6 @@
 # WebSocket
 Go HTTP implementation as defined in protocol RFC 9110.
 
-//TODO: Send 400 when cant parse request or response
 //TODO:Content Serving:
     Serve static files from the filesystem.
     Implement a basic way to handle dynamic content, perhaps through a simple CGI mechanism or templating.

@@ -1,6 +1,7 @@
 package gohttp
 
 import (
+	"errors"
 	"slices"
 	"strings"
 )
@@ -8,7 +9,6 @@ import (
 type Headers map[string]string
 
 const softwareName = "GoHTTP 1.0"
-
 const (
 	MethodGet     = "GET"
 	MethodHead    = "HEAD"
@@ -61,6 +61,10 @@ var reasons = map[int]string{
 	STATUS_BAD_GATEWAY:         "Bad Gateway",
 	STATUS_SERVICE_UNAVAILABLE: "Service Unavailable",
 }
+
+const KEEP_ALIVE_TIMEOUT = 5
+
+var ErrParsing = errors.New("parsing error")
 
 func isEmpty(element string) bool {
 	return element == ""

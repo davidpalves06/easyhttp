@@ -2,8 +2,12 @@ package gohttp
 
 import (
 	"errors"
+	"io"
 	"net"
+	"time"
 )
+
+var activeConnections map[string]net.Conn = make(map[string]net.Conn)
 
 func GET(request HTTPRequest) (*HTTPResponse, error) {
 	request.method = MethodGet
@@ -28,11 +32,17 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 		}
 		request.uri.Host = host
 	}
-	connection, err := net.Dial("tcp", request.uri.Host)
-	if err != nil {
-		return nil, err
+
+	var connection net.Conn
+	var err error
+
+	connection, exists := activeConnections[request.uri.Host]
+	if !exists || !checkIfConnectionIsStillOpen(connection) {
+		connection, err = net.Dial("tcp", request.uri.Host)
+		if err != nil {
+			return nil, err
+		}
 	}
-	defer connection.Close()
 
 	requestBytes, err := request.toBytes()
 	if err != nil {
@@ -46,5 +56,24 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if isClosingRequest(&request) {
+		connection.Close()
+		delete(activeConnections, request.uri.Host)
+	} else {
+		activeConnections[request.uri.Host] = connection
+	}
 	return response, nil
+}
+
+func checkIfConnectionIsStillOpen(connection net.Conn) bool {
+	one := make([]byte, 1)
+	connection.SetReadDeadline(time.Now().Add(100 * time.Microsecond))
+
+	if _, err := connection.Read(one); err == io.EOF {
+		return false
+	} else {
+		connection.SetReadDeadline(time.Time{})
+		return true
+	}
 }

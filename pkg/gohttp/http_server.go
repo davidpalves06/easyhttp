@@ -51,53 +51,58 @@ func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunct
 func HandleConnection(connection net.Conn, server *HTTPServer) {
 	defer connection.Close()
 	defer server.waitGroup.Done()
-	// for server.running {
-	request, err := parseRequestFromConnection(connection)
-	if err != nil {
-		badRequestResponse := HTTPResponse{
-			version:    "1.0",
-			StatusCode: 400,
-		}
-		responseBytes, _ := badRequestResponse.toBytes()
-		connection.Write(responseBytes)
-		return
-	}
-
-	responseWriter := &HTTPResponseWriter{
-		headers:    make(map[string]string),
-		statusCode: STATUS_OK,
-		buffer:     new(bytes.Buffer),
-	}
-
-	if handlers, exists := server.uriHandlers[request.method]; exists {
-		var handled = false
-		for _, handler := range handlers {
-			var uriPattern = handler.uriPattern
-			if isURIMatch(request.uri.Path, uriPattern) {
-				handler.handler(*request, responseWriter)
-				handled = true
-				break
+	var keepAlive = true
+	for server.running && keepAlive {
+		request, err := parseRequestFromConnection(connection)
+		if err != nil {
+			if err == ErrParsing {
+				badRequestResponse := newBadRequest()
+				responseBytes, _ := badRequestResponse.toBytes()
+				connection.Write(responseBytes)
+				continue
+			} else {
+				return
 			}
 		}
-		if !handled {
+
+		responseWriter := &HTTPResponseWriter{
+			headers:    make(map[string]string),
+			statusCode: STATUS_OK,
+			buffer:     new(bytes.Buffer),
+		}
+
+		if handlers, exists := server.uriHandlers[request.method]; exists {
+			var handled = false
+			for _, handler := range handlers {
+				var uriPattern = handler.uriPattern
+				if isURIMatch(request.uri.Path, uriPattern) {
+					handler.handler(*request, responseWriter)
+					handled = true
+					break
+				}
+			}
+			if !handled {
+				responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+			}
+		} else {
 			responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
 		}
-	} else {
-		responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
-	}
 
-	if request.method == MethodHead {
-		responseWriter.buffer = nil
+		if request.method == MethodHead {
+			responseWriter.buffer = nil
+		}
+		var response = newHTTPResponse(*responseWriter)
+		response.version = request.version
+		responseBytes, err := response.toBytes()
+		if err != nil {
+			badRequestResponse := newBadRequest()
+			responseBytes, _ := badRequestResponse.toBytes()
+			connection.Write(responseBytes)
+			return
+		}
+		keepAlive = !isClosingRequest(request)
+		connection.Write(responseBytes)
 	}
-	var response = newHTTPResponse(*responseWriter)
-	response.version = request.version
-	responseBytes, err := response.toBytes()
-	if err != nil {
-		// break
-		return
-	}
-	connection.Write(responseBytes)
-	// }
 }
 
 func (s *HTTPServer) AcceptConnection() (net.Conn, error) {

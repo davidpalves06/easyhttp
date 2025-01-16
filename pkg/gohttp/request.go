@@ -100,27 +100,35 @@ func NewRequest(uri string) (HTTPRequest, error) {
 	return newRequest, nil
 }
 
+func newBadRequest() HTTPResponse {
+	badRequestResponse := HTTPResponse{
+		version:    "1.0",
+		StatusCode: 400,
+	}
+	return badRequestResponse
+}
+
 func parseRequestLine(firstLineSplit []string, request *HTTPRequest) error {
 	if len(firstLineSplit) != 3 {
-		return errors.New("incomplete Request Targets")
+		return ErrParsing
 	}
 	var method string = firstLineSplit[0]
 	if !slices.Contains(validMethods, method) {
-		return errors.New("invalid HTTP Method")
+		return ErrParsing
 	}
 	request.method = method
 
 	var requestUri = firstLineSplit[1]
 	parsedUri, err := url.ParseRequestURI(requestUri)
 	if err != nil {
-		return errors.New("invalid Uri")
+		return ErrParsing
 	}
 	request.uri = parsedUri
 
 	var version = firstLineSplit[2]
 	versionSplit := strings.Split(version, "/")
 	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || !slices.Contains(validVersions, versionSplit[1]) {
-		return errors.New("invalid HTTP Version")
+		return ErrParsing
 	}
 	request.version = versionSplit[1]
 	return nil
@@ -135,7 +143,9 @@ func parseHeaders(splitedInput []string, request *HTTPRequest) uint8 {
 			break
 		}
 		headerSplit := strings.Split(line, ":")
-		request.SetHeader(headerSplit[0], strings.TrimSpace(strings.Join(headerSplit[1:], ":")))
+		if len(headerSplit) >= 2 {
+			request.SetHeader(headerSplit[0], strings.TrimSpace(strings.Join(headerSplit[1:], ":")))
+		}
 		headerLine += 1
 	}
 	return headerLine
@@ -143,7 +153,7 @@ func parseHeaders(splitedInput []string, request *HTTPRequest) uint8 {
 
 func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 	var buffer []byte = make([]byte, 2048)
-	connection.SetReadDeadline(time.Now().Add(5 * time.Second))
+	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 	bytesRead, err := connection.Read(buffer)
 	if err != nil || bytesRead == 0 {
 		return nil, err
@@ -168,7 +178,7 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 	if hasBody {
 		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil {
-			return nil, errors.New("content length is not parsable")
+			return nil, ErrParsing
 		}
 
 		stringBody := strings.Join(splitedInput[headerLine:], "\r\n")
@@ -178,11 +188,12 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 
 			var readSize int = len(stringBody)
 			bodyBuffer.Write([]byte(stringBody))
+
 			for readSize < int(bodyLength) {
 				connection.SetReadDeadline(time.Now().Add(5 * time.Second))
 				read, err := connection.Read(buffer)
 				if (err != nil && err != io.EOF) || read == 0 {
-					return nil, errors.New("error with the request body")
+					return nil, ErrParsing
 				}
 
 				read = int(math.Min(float64(bodyLength-int64(readSize)), float64(read)))
@@ -197,4 +208,13 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 
 	}
 	return request, nil
+}
+
+func isClosingRequest(request *HTTPRequest) bool {
+	connection, exists := request.GetHeader("Connection")
+	if request.version == "1.0" {
+		return !(exists && connection == "keep-alive")
+	} else {
+		return exists && connection == "close"
+	}
 }

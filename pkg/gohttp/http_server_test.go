@@ -2,7 +2,6 @@ package gohttp
 
 import (
 	"bytes"
-	"log"
 	"net/http"
 	"testing"
 )
@@ -42,13 +41,11 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)
 	go func() {
-		log.Println("Starting")
 		server.Run()
 	}()
 
 	// Return a function to teardown the test
 	return func(tb testing.TB) {
-		log.Println("Closing")
 		server.Close()
 	}
 }
@@ -82,7 +79,13 @@ func TestServerGet(t *testing.T) {
 		t.FailNow()
 	}
 
-	response, err = http.Get("http://localhost:1234/resource")
+	request, err := http.NewRequest(MethodGet, "http://localhost:1234/resource", nil)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	request.Header.Add("Connection", "close")
+
+	response, err = http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -99,17 +102,20 @@ func TestServerPost(t *testing.T) {
 	bodyBuffer := make([]byte, 1024)
 
 	body := "name=FirstName%20LastName&email=bsmth%40example.com"
-	response, err := http.Post("http://localhost:1234/resource", "plaintext", bytes.NewReader([]byte(body)))
+	request, err := http.NewRequest(MethodPost, "http://localhost:1234/resource", bytes.NewReader([]byte(body)))
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	request.Header.Add("Connection", "close")
+	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Error(err.Error())
 	}
 	if response.StatusCode != STATUS_OK || response.Header.Get("TestHeader") != "Hello" {
-		log.Println("1")
 		t.FailNow()
 	}
 	bodyLength, _ := response.Body.Read(bodyBuffer)
 	if string(bodyBuffer[:bodyLength]) != "Hello World!\n" {
-		log.Println("1")
 		t.FailNow()
 	}
 }
