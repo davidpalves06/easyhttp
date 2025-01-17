@@ -1,6 +1,7 @@
 package gohttp
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"net/textproto"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,7 +42,7 @@ type HTTPResponse struct {
 }
 
 func (r *HTTPResponse) SetHeader(key string, value string) {
-	r.headers[strings.ToLower(key)] = value
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
 }
 
 func (r *HTTPResponse) GetHeader(key string) (string, bool) {
@@ -119,10 +121,12 @@ func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
 	return response
 }
 
-func parseResponseStatusLine(firstLineSplit []string, response *HTTPResponse) error {
+func parseResponseStatusLine(statusLine string, response *HTTPResponse) error {
+	var firstLineSplit = strings.Split(statusLine, " ")
 	if len(firstLineSplit) < 3 {
 		return errors.New("incomplete Status Line")
 	}
+
 	var version string = firstLineSplit[0]
 	versionSplit := strings.Split(version, "/")
 	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || !slices.Contains(validVersions, versionSplit[1]) {
@@ -141,18 +145,18 @@ func parseResponseStatusLine(firstLineSplit []string, response *HTTPResponse) er
 	return nil
 }
 
-func parseResponseHeaders(splitedInput []string, response *HTTPResponse) uint8 {
-	var headerLine uint8 = 1
-	for _, line := range splitedInput[1:] {
+func parseResponseHeaders(responseReader *textproto.Reader, response *HTTPResponse) {
+	for {
+		var line, err = responseReader.ReadLine()
+		if err != nil {
+			continue
+		}
 		if line == "" {
-			headerLine += 1
 			break
 		}
 		headerSplit := strings.Split(line, ":")
-		response.SetHeader(headerSplit[0], strings.TrimSpace(strings.Join(headerSplit[1:], ":")))
-		headerLine += 1
+		response.SetHeader(headerSplit[0], strings.Join(headerSplit[1:], ":"))
 	}
-	return headerLine
 }
 
 func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
@@ -161,20 +165,22 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 	}
 	var buffer []byte = make([]byte, 2048)
 	bytesRead, err := connection.Read(buffer)
-	if err != nil {
-		log.Println("Failed to read response", err)
+	if err != nil || bytesRead == 0 {
 		return nil, err
 	}
 
-	var responseString = string(buffer[:bytesRead])
-	splitedInput := strings.Split(responseString, "\r\n")
-	firstLineSplit := strings.Split(splitedInput[0], " ")
-	err = parseResponseStatusLine(firstLineSplit, response)
+	var responseReader = textproto.NewReader(bufio.NewReader(bytes.NewReader(buffer)))
+	statusLine, err := responseReader.ReadLine()
 	if err != nil {
 		return nil, err
 	}
 
-	headerLine := parseResponseHeaders(splitedInput, response)
+	err = parseResponseStatusLine(statusLine, response)
+	if err != nil {
+		return nil, err
+	}
+
+	parseResponseHeaders(responseReader, response)
 
 	contentLengthValue, hasBody := response.GetHeader("Content-Length")
 
@@ -183,29 +189,34 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 		if err != nil || bodyLength == 0 {
 			return nil, errors.New("content length is not valid")
 		}
-		stringBody := strings.Join(splitedInput[headerLine:], "\r\n")
 
-		var bodyBuffer *bytes.Buffer = new(bytes.Buffer)
+		var bodyBuffer []byte = make([]byte, 2048)
+		readBodyLength, err := responseReader.R.Read(bodyBuffer)
+		if err != nil {
+			return nil, err
+		}
 
-		if int(bodyLength) > len(stringBody) {
-			var readSize int = len(stringBody)
-			bodyBuffer.Write([]byte(stringBody[:readSize]))
+		var bodyBytes *bytes.Buffer = new(bytes.Buffer)
+
+		if int(bodyLength) > readBodyLength {
+			var readSize int = readBodyLength
+			bodyBytes.Write(bodyBuffer[:readBodyLength])
 
 			for readSize < int(bodyLength) {
-				read, err := connection.Read(buffer)
+				read, err := connection.Read(bodyBuffer)
 				if err != nil && err != io.EOF {
-					return nil, errors.New("error with the request body")
+					return nil, err
 				}
 
 				read = int(math.Min(float64(bodyLength-int64(readSize)), float64(read)))
-				bodyBuffer.Write(buffer[:read])
+				bodyBytes.Write(bodyBuffer[:read])
 				readSize += read
 			}
 		} else {
-			bodyBuffer.Write([]byte(stringBody[:bodyLength]))
+			bodyBytes.Write(bodyBuffer[:bodyLength])
 		}
 
-		response.Body = bodyBuffer
+		response.Body = bodyBytes
 	} else {
 		response.Body = nil
 	}

@@ -34,7 +34,6 @@ func TestLargeFiles(t *testing.T) {
 	if response.StatusCode != STATUS_OK || !exists || headerValue != "Hello" {
 		t.FailNow()
 	}
-
 	headerLength, exists := response.GetHeader("Content-Length")
 	if !exists || headerLength != "362128" {
 		t.Fatalf("Body length is incorrect")

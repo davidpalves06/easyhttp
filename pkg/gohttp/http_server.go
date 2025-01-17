@@ -59,10 +59,8 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 				badRequestResponse := newBadRequest()
 				responseBytes, _ := badRequestResponse.toBytes()
 				connection.Write(responseBytes)
-				continue
-			} else {
-				return
 			}
+			return
 		}
 
 		responseWriter := &HTTPResponseWriter{
