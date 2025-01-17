@@ -29,9 +29,9 @@ func TestClientGet(t *testing.T) {
 		t.Fatalf("Wrong Status Code: %d\n", response.StatusCode)
 	}
 
-	value, exists := response.GetHeader("TestHeader")
-	if !exists || value != "Hello" {
-		t.Fatalf("Wrong Header : %v\n", exists)
+	value := response.GetHeader("TestHeader")
+	if value != "Hello" {
+		t.Fatalf("Wrong Header : %v\n", value)
 	}
 	bodyBuffer := make([]byte, 1024)
 	bodyLength, _ := response.Body.Read(bodyBuffer)
@@ -62,9 +62,9 @@ func TestClientPost(t *testing.T) {
 	if response.StatusCode != STATUS_OK {
 		t.Fatalf("Wrong Status code")
 	}
-	value, exists := response.GetHeader("TestHeader")
-	if !exists || value != "Hello" {
-		t.Fatalf("Wrong Header : %v\n", exists)
+	value := response.GetHeader("TestHeader")
+	if value != "Hello" {
+		t.Fatalf("Wrong Header : %v\n", value)
 	}
 	bodyBuffer := make([]byte, 1024)
 	bodyLength, _ := response.Body.Read(bodyBuffer)

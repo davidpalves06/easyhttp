@@ -33,6 +33,8 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 		request.uri.Host = host
 	}
 
+	request.SetHeader("Host", request.uri.Host)
+
 	var connection net.Conn
 	var err error
 

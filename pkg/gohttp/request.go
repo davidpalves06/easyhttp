@@ -28,9 +28,18 @@ func (r *HTTPRequest) SetHeader(key string, value string) {
 	r.headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
 }
 
-func (r *HTTPRequest) GetHeader(key string) (string, bool) {
+func (r *HTTPRequest) GetHeader(key string) string {
 	value, found := r.headers[strings.ToLower(key)]
-	return value, found
+	if found {
+		return value
+	} else {
+		return ""
+	}
+}
+
+func (r *HTTPRequest) ExistsHeader(key string) bool {
+	_, found := r.headers[strings.ToLower(key)]
+	return found
 }
 
 func (r *HTTPRequest) Headers() Headers {
@@ -177,9 +186,12 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 	}
 
 	parseHeaders(requestReader, request)
+	if request.GetHeader("Host") == "" {
+		return nil, ErrParsing
+	}
 
-	contentLengthValue, hasBody := request.GetHeader("Content-Length")
-	if hasBody {
+	contentLengthValue := request.GetHeader("Content-Length")
+	if contentLengthValue != "" {
 		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil {
 			return nil, ErrParsing
@@ -213,16 +225,16 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 		}
 
 		request.Body = bodyBytes.Bytes()
-
 	}
+
 	return request, nil
 }
 
 func isClosingRequest(request *HTTPRequest) bool {
-	connection, exists := request.GetHeader("Connection")
+	connection := request.GetHeader("Connection")
 	if request.version == "1.0" {
-		return !(exists && connection == "keep-alive")
+		return connection != "keep-alive"
 	} else {
-		return exists && connection == "close"
+		return connection == "close"
 	}
 }

@@ -45,9 +45,18 @@ func (r *HTTPResponse) SetHeader(key string, value string) {
 	r.headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
 }
 
-func (r *HTTPResponse) GetHeader(key string) (string, bool) {
+func (r *HTTPResponse) GetHeader(key string) string {
 	value, found := r.headers[strings.ToLower(key)]
-	return value, found
+	if found {
+		return value
+	} else {
+		return ""
+	}
+}
+
+func (r *HTTPResponse) ExistsHeader(key string) bool {
+	_, found := r.headers[strings.ToLower(key)]
+	return found
 }
 
 func (r *HTTPResponse) Headers() Headers {
@@ -67,9 +76,9 @@ func (r HTTPResponse) toBytes() ([]byte, error) {
 
 	buffer.WriteString("\r\n")
 
-	contentLengthValue, hasBody := r.GetHeader("Content-Length")
+	contentLengthValue := r.GetHeader("Content-Length")
 
-	if hasBody {
+	if contentLengthValue != "" {
 		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil || bodyLength == 0 {
 			return nil, errors.New("content length not valid")
@@ -182,9 +191,9 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 
 	parseResponseHeaders(responseReader, response)
 
-	contentLengthValue, hasBody := response.GetHeader("Content-Length")
+	contentLengthValue := response.GetHeader("Content-Length")
 
-	if hasBody {
+	if contentLengthValue != "" {
 		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil || bodyLength == 0 {
 			return nil, errors.New("content length is not valid")
