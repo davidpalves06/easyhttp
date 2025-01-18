@@ -84,6 +84,7 @@ func TestHeadRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	request.headers["Connection"] = "close"
 	response, err := HEAD(request)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -114,7 +115,7 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 	}
 
 	if response.version != "1.1" {
-		t.Fatalf("HTTP VERSION IS WRONG")
+		t.Fatal("HTTP VERSION IS WRONG")
 	}
 
 	headerValue := response.GetHeader("TestHeader")
@@ -128,7 +129,6 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 	if string(bodyBuffer[:bodyLength]) != "Hello World!\n" {
 		t.FailNow()
 	}
-
 	//w8 for connection to be closed by server
 	time.Sleep(6 * time.Second)
 

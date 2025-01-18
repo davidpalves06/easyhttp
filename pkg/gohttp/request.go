@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"math"
 	"net"
 	"net/textproto"
 	"net/url"
@@ -46,10 +44,19 @@ func (r *HTTPRequest) Headers() Headers {
 	return r.headers
 }
 
+func (r *HTTPRequest) Version(version string) error {
+	if slices.Contains(validVersions, version) {
+		r.version = version
+		return nil
+	}
+	return errors.New("invalid Version")
+}
+
 func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	var requestLine = fmt.Sprintf("%s %s HTTP/%s\r\n", r.method, r.uri.RequestURI(), r.version)
 	buffer.WriteString(requestLine)
+
 	r.SetHeader("Content-Length", strconv.Itoa(len(r.Body)))
 
 	r.headers["User-Agent"] = softwareName
@@ -72,7 +79,6 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 		}
 
 		buffer.Write(r.Body[:bodyLength])
-
 	}
 	return buffer.Bytes(), nil
 }
@@ -85,7 +91,7 @@ func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
 
 	newRequest := HTTPRequest{
 		headers: make(Headers),
-		version: "1.0",
+		version: "1.1",
 		Body:    body,
 		uri:     requestURI,
 	}
@@ -104,7 +110,7 @@ func NewRequest(uri string) (HTTPRequest, error) {
 	}
 	newRequest := HTTPRequest{
 		headers: make(Headers),
-		version: "1.0",
+		version: "1.1",
 		Body:    nil,
 		uri:     requestURI,
 	}
@@ -164,22 +170,15 @@ func parseHeaders(requestReader *textproto.Reader, request *HTTPRequest) {
 }
 
 func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
-	var buffer []byte = make([]byte, 2048)
 	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	bytesRead, err := connection.Read(buffer)
-	if err != nil || bytesRead == 0 {
-		return nil, err
-	}
+	var requestReader = textproto.NewReader(bufio.NewReader(connection))
 	var request *HTTPRequest = &HTTPRequest{
 		headers: make(map[string]string),
 	}
-
-	var requestReader = textproto.NewReader(bufio.NewReader(bytes.NewReader(buffer)))
 	requestLine, err := requestReader.ReadLine()
 	if err != nil {
 		return nil, err
 	}
-
 	err = parseRequestLine(requestLine, request)
 	if err != nil {
 		return nil, err
@@ -190,41 +189,26 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 		return nil, ErrParsing
 	}
 
+	transferEncoding := request.GetHeader("Transfer-Encoding")
 	contentLengthValue := request.GetHeader("Content-Length")
-	if contentLengthValue != "" {
+
+	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+	if request.version == "1.1" && transferEncoding == "chunked" {
+		request.Body, err = parseChunkedBody(requestReader)
+		if err != nil {
+			return nil, err
+		}
+	} else if contentLengthValue != "" {
 		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil {
 			return nil, ErrParsing
 		}
-
-		var bodyBuffer []byte = make([]byte, 2048)
-		readBodyLength, err := requestReader.R.Read(bodyBuffer)
-		if err != nil {
-			return nil, err
-		}
-
-		var bodyBytes *bytes.Buffer = new(bytes.Buffer)
-		if int(bodyLength) > readBodyLength {
-
-			var readSize int = readBodyLength
-			bodyBytes.Write(bodyBuffer[:readBodyLength])
-
-			for readSize < int(bodyLength) {
-				connection.SetReadDeadline(time.Now().Add(5 * time.Second))
-				read, err := connection.Read(bodyBuffer)
-				if (err != nil && err != io.EOF) || read == 0 {
-					return nil, err
-				}
-
-				read = int(math.Min(float64(bodyLength-int64(readSize)), float64(read)))
-				bodyBytes.Write(bodyBuffer[:read])
-				readSize += read
+		if bodyLength != 0 {
+			request.Body, err = parseBodyWithFullContent(bodyLength, requestReader)
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			bodyBytes.Write(bodyBuffer[:bodyLength])
 		}
-
-		request.Body = bodyBytes.Bytes()
 	}
 
 	return request, nil

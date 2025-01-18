@@ -25,6 +25,7 @@ func TestLargeFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	request.Version("1.0")
 	response, err := POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -71,6 +72,8 @@ func TestSmallerContentLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	request.Version("1.0")
+
 	request.SetHeader("Content-Length", "10000")
 	response, err := POST(request)
 	if err != nil {
@@ -119,6 +122,7 @@ func TestBiggerContentLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	request.Version("1.0")
 	request.SetHeader("Content-Length", "1000000")
 	response, err := POST(request)
 	if err != nil {

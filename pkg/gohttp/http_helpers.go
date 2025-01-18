@@ -1,8 +1,12 @@
 package gohttp
 
 import (
+	"bytes"
 	"errors"
+	"io"
+	"net/textproto"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -93,4 +97,45 @@ func isURIMatch(requestPath string, pattern string) bool {
 	}
 
 	return j == len(requestParts)
+}
+
+func parseBodyWithFullContent(bodyLength int64, requestReader *textproto.Reader) ([]byte, error) {
+	var bodyBuffer []byte = make([]byte, bodyLength)
+	readBodyLength, err := io.ReadFull(requestReader.R, bodyBuffer)
+	if err != nil {
+		return nil, err
+	}
+
+	return bodyBuffer[:readBodyLength], nil
+}
+
+func parseChunkedBody(requestReader *textproto.Reader) ([]byte, error) {
+	var bodyBytes *bytes.Buffer = new(bytes.Buffer)
+	var isFinished = false
+	for !isFinished {
+		firstLine, err := requestReader.ReadLine()
+		for err != nil || firstLine == "" {
+			firstLine, err = requestReader.ReadLine()
+			if err != nil {
+				return nil, err
+			}
+		}
+		firstLine = strings.TrimSpace(firstLine)
+		chunkLength, err := strconv.ParseUint(firstLine, 16, 32)
+		if err != nil {
+			return nil, err
+		}
+		if chunkLength != 0 {
+			var chunkBuffer = make([]byte, chunkLength)
+			read, err := io.ReadFull(requestReader.R, chunkBuffer)
+			if err != nil {
+				return nil, err
+			}
+			bodyBytes.Write(chunkBuffer[:read])
+		} else {
+			isFinished = true
+		}
+		requestReader.ReadLine()
+	}
+	return bodyBytes.Bytes(), nil
 }

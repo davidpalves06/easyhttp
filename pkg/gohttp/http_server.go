@@ -55,7 +55,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	for server.running && keepAlive {
 		request, err := parseRequestFromConnection(connection)
 		if err != nil {
-			if err == ErrParsing {
+			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 				badRequestResponse := newBadRequest()
 				responseBytes, _ := badRequestResponse.toBytes()
 				connection.Write(responseBytes)
@@ -89,6 +89,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		if request.method == MethodHead {
 			responseWriter.buffer = nil
 		}
+
 		var response = newHTTPResponse(*responseWriter)
 		response.version = request.version
 		responseBytes, err := response.toBytes()
