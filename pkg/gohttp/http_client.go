@@ -54,6 +54,11 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if request.chunked {
+		request.sendChunks(connection)
+	}
+
 	response, err := parseResponsefromConnection(connection)
 	if err != nil {
 		return nil, err

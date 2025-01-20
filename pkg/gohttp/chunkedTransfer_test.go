@@ -11,27 +11,35 @@ func TestChunkedTransfer(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
 
-	file, err := os.Open("testdata/lusiadasTest.txt")
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	body, err := io.ReadAll(file)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	request, err := NewRequestWithBody("http://localhost:1234/large", body)
+	request, err := NewRequestWithBody("http://localhost:1234/large", []byte("This should be ignored"))
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	// request.headers["Transfer-Encoding"] = "chunked"
 	request.headers["Connection"] = "close"
+	request.Chunked()
+
+	go func() {
+		file, err := os.Open("testdata/lusiadasTest.txt")
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		var chunkBuffer = make([]byte, 4096)
+		for {
+			read, err := io.ReadFull(file, chunkBuffer)
+			if err == io.EOF {
+				break
+			}
+			request.SendChunk(chunkBuffer[:read])
+		}
+		request.Done()
+
+	}()
+
 	response, err := POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-
 	headerValue := response.GetHeader("TestHeader")
 	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()

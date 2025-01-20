@@ -15,11 +15,13 @@ import (
 )
 
 type HTTPRequest struct {
-	method  string
-	uri     *url.URL
-	version string
-	headers Headers
-	Body    []byte
+	method       string
+	uri          *url.URL
+	version      string
+	headers      Headers
+	Body         []byte
+	chunkChannel chan []byte
+	chunked      bool
 }
 
 func (r *HTTPRequest) SetHeader(key string, value string) {
@@ -52,12 +54,28 @@ func (r *HTTPRequest) Version(version string) error {
 	return errors.New("invalid Version")
 }
 
+func (r *HTTPRequest) SendChunk(chunk []byte) {
+	r.chunkChannel <- chunk
+}
+
+func (r *HTTPRequest) Done() {
+	close(r.chunkChannel)
+}
+
+func (r *HTTPRequest) Chunked() {
+	r.chunked = true
+}
+
 func (r HTTPRequest) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	var requestLine = fmt.Sprintf("%s %s HTTP/%s\r\n", r.method, r.uri.RequestURI(), r.version)
 	buffer.WriteString(requestLine)
 
-	r.SetHeader("Content-Length", strconv.Itoa(len(r.Body)))
+	if r.chunked {
+		r.SetHeader("Transfer-Encoding", "chunked")
+	} else if len(r.Body) > 0 {
+		r.SetHeader("Content-Length", strconv.Itoa(len(r.Body)))
+	}
 
 	r.headers["User-Agent"] = softwareName
 
@@ -68,7 +86,7 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 
 	buffer.WriteString("\r\n")
 
-	if r.Body != nil {
+	if r.Body != nil && !r.chunked {
 		bodyLength := len(r.Body)
 		if bodyLength == 0 {
 			return nil, errors.New("content length is not valid")
@@ -83,6 +101,21 @@ func (r HTTPRequest) toBytes() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+func (r HTTPRequest) sendChunks(connection net.Conn) {
+	for chunk := range r.chunkChannel {
+		buffer := new(bytes.Buffer)
+		chunkLength := fmt.Sprintf("%x \r\n", len(chunk))
+		buffer.WriteString(chunkLength)
+		buffer.Write(chunk)
+
+		buffer.WriteString("\r\n")
+
+		connection.Write(buffer.Bytes())
+	}
+
+	connection.Write([]byte("0 \r\n\r\n"))
+}
+
 func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
 	requestURI, err := url.ParseRequestURI(uri)
 	if err != nil {
@@ -90,10 +123,12 @@ func NewRequestWithBody(uri string, body []byte) (HTTPRequest, error) {
 	}
 
 	newRequest := HTTPRequest{
-		headers: make(Headers),
-		version: "1.1",
-		Body:    body,
-		uri:     requestURI,
+		headers:      make(Headers),
+		version:      "1.1",
+		Body:         body,
+		chunkChannel: make(chan []byte, 1),
+		chunked:      false,
+		uri:          requestURI,
 	}
 
 	if len(body) > 0 {
@@ -109,10 +144,12 @@ func NewRequest(uri string) (HTTPRequest, error) {
 		return HTTPRequest{}, errors.New("uri is not valid")
 	}
 	newRequest := HTTPRequest{
-		headers: make(Headers),
-		version: "1.1",
-		Body:    nil,
-		uri:     requestURI,
+		headers:      make(Headers),
+		version:      "1.1",
+		Body:         nil,
+		chunkChannel: make(chan []byte, 1),
+		chunked:      false,
+		uri:          requestURI,
 	}
 	return newRequest, nil
 }
@@ -191,7 +228,6 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 
 	transferEncoding := request.GetHeader("Transfer-Encoding")
 	contentLengthValue := request.GetHeader("Content-Length")
-
 	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 	if request.version == "1.1" && transferEncoding == "chunked" {
 		request.Body, err = parseChunkedBody(requestReader)
