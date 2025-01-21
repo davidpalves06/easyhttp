@@ -23,12 +23,12 @@ func TestVersion(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
 	bodyBuffer := make([]byte, 1024)
-	bodyLength, _ := response.Body.Read(bodyBuffer)
+	bodyLength, _ := response.Read(bodyBuffer)
 	if string(bodyBuffer[:bodyLength]) != "Hello World!\n" {
 		t.FailNow()
 	}
@@ -48,11 +48,11 @@ func TestVersion(t *testing.T) {
 	}
 
 	headerValue = response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
-	bodyLength, _ = response.Body.Read(bodyBuffer)
+	bodyLength, _ = response.Read(bodyBuffer)
 	if string(bodyBuffer[:bodyLength]) != "Hello World!\n" {
 		t.FailNow()
 	}
@@ -71,7 +71,7 @@ func TestVersion(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
+	if response.statusCode != STATUS_NOT_IMPLEMENTED {
 		t.FailNow()
 	}
 }
@@ -91,10 +91,10 @@ func TestHeadRequests(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
-	if response.Body != nil {
+	if response.HasBody() {
 		t.Fatalf("Body is not empty\n")
 	}
 
@@ -119,13 +119,13 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
 	bodyBuffer := make([]byte, 1024)
 
-	bodyLength, _ := response.Body.Read(bodyBuffer)
+	bodyLength, _ := response.Read(bodyBuffer)
 	if string(bodyBuffer[:bodyLength]) != "Hello World!\n" {
 		t.FailNow()
 	}
@@ -146,7 +146,7 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
+	if response.statusCode != STATUS_NOT_IMPLEMENTED {
 		t.FailNow()
 	}
 

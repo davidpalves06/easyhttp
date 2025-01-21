@@ -32,7 +32,7 @@ func TestLargeFiles(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 	headerLength := response.GetHeader("Content-Length")
@@ -43,7 +43,7 @@ func TestLargeFiles(t *testing.T) {
 	bodyBuffer := make([]byte, 1024)
 	var totalRead int
 	for {
-		read, err := response.Body.Read(bodyBuffer)
+		read, err := response.Read(bodyBuffer)
 		if err != nil {
 			break
 		}
@@ -81,7 +81,7 @@ func TestSmallerContentLength(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
@@ -93,7 +93,7 @@ func TestSmallerContentLength(t *testing.T) {
 	bodyBuffer := make([]byte, 1024)
 	var totalRead int
 	for {
-		read, err := response.Body.Read(bodyBuffer)
+		read, err := response.Read(bodyBuffer)
 		if err != nil {
 			break
 		}
@@ -130,7 +130,7 @@ func TestBiggerContentLength(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
@@ -142,7 +142,7 @@ func TestBiggerContentLength(t *testing.T) {
 	bodyBuffer := make([]byte, 1024)
 	var totalRead int
 	for {
-		read, err := response.Body.Read(bodyBuffer)
+		read, err := response.Read(bodyBuffer)
 		if err != nil {
 			break
 		}

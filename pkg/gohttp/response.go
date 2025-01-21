@@ -16,33 +16,64 @@ import (
 	"time"
 )
 
-type HTTPResponseWriter struct {
-	headers    Headers
-	statusCode int
-	buffer     *bytes.Buffer
-}
-
-func (r *HTTPResponseWriter) Write(p []byte) (n int, err error) {
-	return r.buffer.Write(p)
-}
-
-func (r *HTTPResponseWriter) SetHeader(headerName string, headerValue string) {
-	r.headers[strings.ToLower(headerName)] = headerValue
-}
-
-func (r *HTTPResponseWriter) SetStatus(status int) {
-	r.statusCode = status
-}
-
 type HTTPResponse struct {
 	headers    Headers
+	statusCode int
 	version    string
-	StatusCode int
-	Body       io.Reader
+	body       *bytes.Buffer
+	conn       net.Conn
+	chunked    bool
+	method     string
 }
 
-func (r *HTTPResponse) SetHeader(key string, value string) {
-	r.headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
+func (r *HTTPResponse) Write(p []byte) (n int, err error) {
+	return r.body.Write(p)
+}
+
+func (r *HTTPResponse) SendChunk() (int, error) {
+	if r.method == MethodHead {
+		return 0, errors.New("head message cannot be chunked")
+	}
+	if !r.chunked {
+		r.chunked = true
+		responseBytes, err := r.toBytes()
+		if err != nil {
+			return 0, err
+		}
+		r.conn.Write(responseBytes)
+	}
+
+	buffer := new(bytes.Buffer)
+	var chunkLength = r.body.Len()
+	if chunkLength <= 0 {
+		return 0, errors.New("chunk size cannot be 0")
+	}
+	chunkLengthLine := fmt.Sprintf("%x \r\n", chunkLength)
+	buffer.WriteString(chunkLengthLine)
+	buffer.Write(r.body.Bytes())
+
+	buffer.WriteString("\r\n")
+
+	r.conn.Write(buffer.Bytes())
+
+	r.body.Reset()
+	return chunkLength, nil
+}
+
+func (r *HTTPResponse) HasBody() bool {
+	return r.body != nil
+}
+
+func (r *HTTPResponse) Read(buffer []byte) (int, error) {
+	return r.body.Read(buffer)
+}
+
+func (r *HTTPResponse) SetHeader(headerName string, headerValue string) {
+	r.headers[strings.ToLower(strings.TrimSpace(headerName))] = strings.TrimSpace(headerValue)
+}
+
+func (r *HTTPResponse) SetStatus(status int) {
+	r.statusCode = status
 }
 
 func (r *HTTPResponse) GetHeader(key string) string {
@@ -63,11 +94,19 @@ func (r *HTTPResponse) Headers() Headers {
 	return r.headers
 }
 
-func (r HTTPResponse) toBytes() ([]byte, error) {
+func (r *HTTPResponse) toBytes() ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	var reasonPhrase = reasons[r.StatusCode]
-	var statusLine = fmt.Sprintf("HTTP/%s %d %s\r\n", r.version, r.StatusCode, reasonPhrase)
+	var reasonPhrase = reasons[r.statusCode]
+	var statusLine = fmt.Sprintf("HTTP/%s %d %s\r\n", r.version, r.statusCode, reasonPhrase)
 	buffer.WriteString(statusLine)
+
+	addEssentialHTTPHeaders(r)
+
+	if r.chunked {
+		r.SetHeader("Transfer-Encoding", "chunked")
+	} else if r.body != nil && r.body.Len() > 0 {
+		r.SetHeader("Content-Length", strconv.Itoa(r.body.Len()))
+	}
 
 	for headerName, headerValue := range r.headers {
 		var headerLine = fmt.Sprintf("%s: %s\r\n", headerName, headerValue)
@@ -77,8 +116,7 @@ func (r HTTPResponse) toBytes() ([]byte, error) {
 	buffer.WriteString("\r\n")
 
 	contentLengthValue := r.GetHeader("Content-Length")
-
-	if contentLengthValue != "" {
+	if contentLengthValue != "" && !r.chunked {
 		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil || bodyLength == 0 {
 			return nil, errors.New("content length not valid")
@@ -88,7 +126,7 @@ func (r HTTPResponse) toBytes() ([]byte, error) {
 		var readSize int64
 
 		for readSize < bodyLength {
-			read, err := r.Body.Read(bodyBuffer)
+			read, err := r.body.Read(bodyBuffer)
 			if err != nil && err != io.EOF {
 				return nil, errors.New("error with the request body")
 			}
@@ -102,32 +140,24 @@ func (r HTTPResponse) toBytes() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func newHTTPResponse(responseWriter HTTPResponseWriter) HTTPResponse {
-	var response = HTTPResponse{
-		headers: make(Headers),
+func newBadRequestResponse() HTTPResponse {
+	badRequestResponse := HTTPResponse{
+		version:    "1.0",
+		statusCode: 400,
 	}
+	return badRequestResponse
+}
+
+func addEssentialHTTPHeaders(response *HTTPResponse) {
 
 	response.SetHeader("Date", time.Now().UTC().Format(time.RFC1123))
 	response.SetHeader("Server", softwareName)
 
-	if responseWriter.statusCode == STATUS_UNAUTHORIZED {
-		if _, exists := responseWriter.headers["WWW-Authenticate"]; !exists {
+	if response.statusCode == STATUS_UNAUTHORIZED {
+		if _, exists := response.headers["WWW-Authenticate"]; !exists {
 			log.Printf("Warning : Status 401 has no WWW-Authenticate header\n")
 		}
 	}
-
-	for headerName, headerValue := range responseWriter.headers {
-		response.SetHeader(headerName, headerValue)
-	}
-
-	if responseWriter.buffer != nil && responseWriter.buffer.Len() > 0 {
-		response.SetHeader("Content-Type", "text/plain")
-		response.SetHeader("Content-Length", strconv.Itoa(responseWriter.buffer.Len()))
-	}
-
-	response.StatusCode = responseWriter.statusCode
-	response.Body = responseWriter.buffer
-	return response
 }
 
 func parseResponseStatusLine(statusLine string, response *HTTPResponse) error {
@@ -148,7 +178,7 @@ func parseResponseStatusLine(statusLine string, response *HTTPResponse) error {
 	if err != nil || parsedStatus < 100 || parsedStatus >= 600 {
 		return errors.New("invalid StatusCode")
 	}
-	response.StatusCode = int(parsedStatus)
+	response.statusCode = int(parsedStatus)
 
 	return nil
 }
@@ -171,6 +201,7 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 	var responseReader = textproto.NewReader(bufio.NewReader(connection))
 	var response = &HTTPResponse{
 		headers: make(Headers),
+		conn:    connection,
 	}
 
 	statusLine, err := responseReader.ReadLine()
@@ -194,13 +225,13 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 		}
 		if bodyLength != 0 {
 			responseBytes, err := parseBodyWithFullContent(bodyLength, responseReader)
-			response.Body = bytes.NewReader(responseBytes)
 			if err != nil {
 				return nil, err
 			}
+			response.body = bytes.NewBuffer(responseBytes)
 		}
 	} else {
-		response.Body = nil
+		response.body = nil
 	}
 
 	return response, nil

@@ -25,8 +25,8 @@ func TestClientGet(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	if response.StatusCode != STATUS_OK {
-		t.Fatalf("Wrong Status Code: %d\n", response.StatusCode)
+	if response.statusCode != STATUS_OK {
+		t.Fatalf("Wrong Status Code: %d\n", response.statusCode)
 	}
 
 	value := response.GetHeader("TestHeader")
@@ -34,7 +34,7 @@ func TestClientGet(t *testing.T) {
 		t.Fatalf("Wrong Header : %v\n", value)
 	}
 	bodyBuffer := make([]byte, 1024)
-	bodyLength, _ := response.Body.Read(bodyBuffer)
+	bodyLength, _ := response.Read(bodyBuffer)
 	if string(bodyBuffer[:bodyLength]) != "Hello World!\n" {
 		t.Fatalf("Wrong Body")
 	}
@@ -59,7 +59,7 @@ func TestClientPost(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	if response.StatusCode != STATUS_OK {
+	if response.statusCode != STATUS_OK {
 		t.Fatalf("Wrong Status code")
 	}
 	value := response.GetHeader("TestHeader")
@@ -67,7 +67,7 @@ func TestClientPost(t *testing.T) {
 		t.Fatalf("Wrong Header : %v\n", value)
 	}
 	bodyBuffer := make([]byte, 1024)
-	bodyLength, _ := response.Body.Read(bodyBuffer)
+	bodyLength, _ := response.Read(bodyBuffer)
 	if string(bodyBuffer[:bodyLength]) != "Echo me this" {
 		t.Fatalf("Wrong Body")
 	}

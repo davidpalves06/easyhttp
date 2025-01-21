@@ -154,14 +154,6 @@ func NewRequest(uri string) (HTTPRequest, error) {
 	return newRequest, nil
 }
 
-func newBadRequest() HTTPResponse {
-	badRequestResponse := HTTPResponse{
-		version:    "1.0",
-		StatusCode: 400,
-	}
-	return badRequestResponse
-}
-
 func parseRequestLine(requestLine string, request *HTTPRequest) error {
 	var requestLineSplit = strings.Split(requestLine, " ")
 	if len(requestLineSplit) != 3 {

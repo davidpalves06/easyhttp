@@ -2,17 +2,20 @@ package gohttp
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"testing"
 )
 
-func handleRequest(request HTTPRequest, response *HTTPResponseWriter) {
+func handleRequest(request HTTPRequest, response *HTTPResponse) {
 	response.SetStatus(STATUS_OK)
 	response.SetHeader("TestHeader", "Hello")
 	response.Write([]byte("Hello World!\n"))
 }
 
-func handleEcho(request HTTPRequest, response *HTTPResponseWriter) {
+func handleEcho(request HTTPRequest, response *HTTPResponse) {
 	bodyBuffer := make([]byte, 1024)
 	buffer := new(bytes.Buffer)
 	bodyReader := bytes.NewReader(request.Body)
@@ -30,6 +33,26 @@ func handleEcho(request HTTPRequest, response *HTTPResponseWriter) {
 	response.SetHeader("TestHeader", "Hello")
 }
 
+func handleChunked(request HTTPRequest, response *HTTPResponse) {
+
+	file, err := os.Open("testdata/lusiadasTest.txt")
+	if err != nil {
+		fmt.Println(err)
+	}
+	response.SetStatus(STATUS_OK)
+	response.SetHeader("TestHeader", "Hello")
+
+	var chunkBuffer = make([]byte, 4096)
+	for {
+		read, err := io.ReadFull(file, chunkBuffer)
+		if err == io.EOF {
+			break
+		}
+		response.Write(chunkBuffer[:read])
+		response.SendChunk()
+	}
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
@@ -40,6 +63,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandleGET("/", handleRequest)
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)
+	server.HandleGET("/chunked", handleChunked)
 	go func() {
 		server.Run()
 	}()

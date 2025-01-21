@@ -63,7 +63,6 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if isClosingRequest(&request) {
 		connection.Close()
 		delete(activeConnections, request.uri.Host)

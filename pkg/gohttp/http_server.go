@@ -14,7 +14,7 @@ type HTTPServer struct {
 	waitGroup   sync.WaitGroup
 }
 
-type ResponseFunction func(HTTPRequest, *HTTPResponseWriter)
+type ResponseFunction func(HTTPRequest, *HTTPResponse)
 
 type responseHandlers struct {
 	uriPattern string
@@ -56,17 +56,20 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		request, err := parseRequestFromConnection(connection)
 		if err != nil {
 			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-				badRequestResponse := newBadRequest()
+				badRequestResponse := newBadRequestResponse()
 				responseBytes, _ := badRequestResponse.toBytes()
 				connection.Write(responseBytes)
 			}
 			return
 		}
 
-		responseWriter := &HTTPResponseWriter{
+		response := &HTTPResponse{
 			headers:    make(map[string]string),
 			statusCode: STATUS_OK,
-			buffer:     new(bytes.Buffer),
+			body:       new(bytes.Buffer),
+			conn:       connection,
+			version:    request.version,
+			method:     request.method,
 		}
 
 		if handlers, exists := server.uriHandlers[request.method]; exists {
@@ -74,33 +77,35 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 			for _, handler := range handlers {
 				var uriPattern = handler.uriPattern
 				if isURIMatch(request.uri.Path, uriPattern) {
-					handler.handler(*request, responseWriter)
+					handler.handler(*request, response)
 					handled = true
 					break
 				}
 			}
 			if !handled {
-				responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+				response.statusCode = STATUS_NOT_IMPLEMENTED
 			}
 		} else {
-			responseWriter.statusCode = STATUS_NOT_IMPLEMENTED
+			response.statusCode = STATUS_NOT_IMPLEMENTED
 		}
 
 		if request.method == MethodHead {
-			responseWriter.buffer = nil
+			response.body = nil
 		}
 
-		var response = newHTTPResponse(*responseWriter)
-		response.version = request.version
-		responseBytes, err := response.toBytes()
-		if err != nil {
-			badRequestResponse := newBadRequest()
-			responseBytes, _ := badRequestResponse.toBytes()
+		if !response.chunked {
+			responseBytes, err := response.toBytes()
+			if err != nil {
+				badRequestResponse := newBadRequestResponse()
+				responseBytes, _ := badRequestResponse.toBytes()
+				connection.Write(responseBytes)
+				return
+			}
 			connection.Write(responseBytes)
-			return
+		} else {
+			connection.Write([]byte("0 \r\n\r\n"))
 		}
 		keepAlive = !isClosingRequest(request)
-		connection.Write(responseBytes)
 	}
 }
 
