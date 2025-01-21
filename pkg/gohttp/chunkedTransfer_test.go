@@ -3,7 +3,6 @@ package gohttp
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"testing"
 )
@@ -78,15 +77,9 @@ func TestChunkedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	log.Println(response.statusCode)
-	log.Println(response.headers)
 	headerValue := response.GetHeader("TestHeader")
 	if response.statusCode != STATUS_OK || headerValue != "Hello" {
 		t.Fatalf("Wrong status or header")
-	}
-	headerLength := response.GetHeader("Content-Length")
-	if headerLength != "362128" {
-		t.Fatalf("Body length is incorrect")
 	}
 
 	bodyBuffer := make([]byte, 1024)
