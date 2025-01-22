@@ -25,14 +25,14 @@ func TestLargeFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	request.Version("1.0")
+	request.SetVersion("1.0")
 	response, err := POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 	headerLength := response.GetHeader("Content-Length")
@@ -72,7 +72,7 @@ func TestSmallerContentLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	request.Version("1.0")
+	request.SetVersion("1.0")
 
 	request.SetHeader("Content-Length", "10000")
 	response, err := POST(request)
@@ -81,7 +81,7 @@ func TestSmallerContentLength(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
@@ -122,7 +122,7 @@ func TestBiggerContentLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	request.Version("1.0")
+	request.SetVersion("1.0")
 	request.SetHeader("Content-Length", "1000000")
 	response, err := POST(request)
 	if err != nil {
@@ -130,7 +130,7 @@ func TestBiggerContentLength(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 

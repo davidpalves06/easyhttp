@@ -42,7 +42,7 @@ func TestChunkedTransfer(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 	headerLength := response.GetHeader("Content-Length")
@@ -78,7 +78,7 @@ func TestChunkedResponse(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.Fatalf("Wrong status or header")
 	}
 
@@ -134,7 +134,7 @@ func TestChunkedServerHandlingWithResponseAfterChunks(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.Fatalf("Wrong status or header")
 	}
 
@@ -182,7 +182,7 @@ func TestChunkedServerHandlingWithoutResponseAfterChunks(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_NO_CONTENT || headerValue != "" {
+	if response.StatusCode != STATUS_NO_CONTENT || headerValue != "" {
 		t.Fatalf("Wrong status or header")
 	}
 
@@ -193,7 +193,7 @@ func TestChunkedServerHandlingWithoutResponseAfterChunks(t *testing.T) {
 
 var total = 0
 
-func handleResponseChunk(chunk []byte, response *HTTPResponse) bool {
+func handleResponseChunk(chunk []byte, response *ClientHTTPResponse) bool {
 	total += len(chunk)
 	return true
 }
@@ -213,7 +213,7 @@ func TestChunkedResponseWithHandlingOnEachChunk(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.Fatalf("Wrong status or header")
 	}
 

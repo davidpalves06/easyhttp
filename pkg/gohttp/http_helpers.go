@@ -4,12 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"net/textproto"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
+
+type HTTPRequest interface {
+	SetHeader(key string, value string)
+	GetHeader(key string) string
+	Version() string
+	SetVersion(version string) error
+}
 
 type Headers map[string]string
 
@@ -110,11 +118,11 @@ func parseBodyWithFullContent(bodyLength int64, bodyReader *textproto.Reader) ([
 	return bodyBuffer[:readBodyLength], nil
 }
 
-func parseChunkedBody[T ServerChunkFunction | ClientChunkFunction](bodyReader *textproto.Reader, request HTTPRequest, response *HTTPResponse, onChunk T) ([]byte, error) {
+func parseServerChunkedBody(bodyReader *textproto.Reader, connection net.Conn, request *ServerHTTPRequest, response *ServerHTTPResponse, onChunk ServerChunkFunction) ([]byte, error) {
 	var bodyBytes *bytes.Buffer = new(bytes.Buffer)
 	var isFinished = false
 	for !isFinished {
-		response.conn.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+		connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 		firstLine, err := bodyReader.ReadLine()
 		for err != nil || firstLine == "" {
 			firstLine, err = bodyReader.ReadLine()
@@ -134,12 +142,7 @@ func parseChunkedBody[T ServerChunkFunction | ClientChunkFunction](bodyReader *t
 				return nil, err
 			}
 			if onChunk != nil {
-				switch chunkFunction := any(onChunk).(type) {
-				case ServerChunkFunction:
-					isFinished = !chunkFunction(chunkBuffer[:read], request, response)
-				case ClientChunkFunction:
-					isFinished = !chunkFunction(chunkBuffer[:read], response)
-				}
+				isFinished = !onChunk(chunkBuffer[:read], *request, response)
 				bodyBytes.Reset()
 			} else {
 				bodyBytes.Write(chunkBuffer[:read])
@@ -150,4 +153,51 @@ func parseChunkedBody[T ServerChunkFunction | ClientChunkFunction](bodyReader *t
 		bodyReader.ReadLine()
 	}
 	return bodyBytes.Bytes(), nil
+}
+
+func parseClientChunkedBody(bodyReader *textproto.Reader, connection net.Conn, response *ClientHTTPResponse, onChunk ClientChunkFunction) (*bytes.Buffer, error) {
+	var bodyBytes *bytes.Buffer = new(bytes.Buffer)
+	var isFinished = false
+	for !isFinished {
+		connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+		firstLine, err := bodyReader.ReadLine()
+		for err != nil || firstLine == "" {
+			firstLine, err = bodyReader.ReadLine()
+			if err != nil {
+				return nil, err
+			}
+		}
+		firstLine = strings.TrimSpace(firstLine)
+		chunkLength, err := strconv.ParseUint(firstLine, 16, 32)
+		if err != nil {
+			return nil, err
+		}
+		if chunkLength != 0 {
+			var chunkBuffer = make([]byte, chunkLength)
+			read, err := io.ReadFull(bodyReader.R, chunkBuffer)
+			if err != nil {
+				return nil, err
+			}
+			if onChunk != nil {
+				isFinished = !onChunk(chunkBuffer[:read], response)
+				bodyBytes.Reset()
+			} else {
+				bodyBytes.Write(chunkBuffer[:read])
+			}
+		} else {
+			isFinished = true
+		}
+		bodyReader.ReadLine()
+	}
+
+	return bodyBytes, nil
+}
+
+func isClosingRequest(request HTTPRequest) bool {
+	connection := request.GetHeader("Connection")
+	if request.Version() == "1.0" {
+		return connection != "keep-alive"
+	} else {
+		return connection == "close"
+	}
 }

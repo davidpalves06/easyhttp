@@ -18,9 +18,9 @@ type HTTPServer struct {
 	waitGroup   sync.WaitGroup
 }
 
-type ResponseFunction func(HTTPRequest, *HTTPResponse)
-type ServerChunkFunction func([]byte, HTTPRequest, *HTTPResponse) bool
-type ClientChunkFunction func([]byte, *HTTPResponse) bool
+type ResponseFunction func(ServerHTTPRequest, *ServerHTTPResponse)
+type ServerChunkFunction func([]byte, ServerHTTPRequest, *ServerHTTPResponse) bool
+type ClientChunkFunction func([]byte, *ClientHTTPResponse) bool
 
 type HandlerOptions struct {
 	onChunk        ServerChunkFunction
@@ -87,7 +87,8 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	var keepAlive = true
 	for server.running && keepAlive {
 		var requestReader = textproto.NewReader(bufio.NewReader(connection))
-		request, err := parseRequestFromConnection(requestReader, connection)
+		connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+		request, err := parseRequestFromConnection(requestReader)
 		if err != nil {
 			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 				badRequestResponse := newBadRequestResponse()
@@ -97,7 +98,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 			return
 		}
 
-		response := newHTTPResponse(request)
+		response := newHTTPResponse(request, connection)
 
 		handler, err := getRequestHandler(server, request)
 		if err != nil {
@@ -108,7 +109,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 			connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 			var err error
 			if request.version == "1.1" && transferEncoding == "chunked" {
-				request.Body, err = parseChunkedBody(requestReader, *request, response, handler.options.onChunk)
+				request.Body, err = parseServerChunkedBody(requestReader, connection, request, response, handler.options.onChunk)
 				if err != nil {
 					if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 						badRequestResponse := newBadRequestResponse()
@@ -164,7 +165,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	}
 }
 
-func getRequestHandler(server *HTTPServer, request *HTTPRequest) (*responseHandlers, error) {
+func getRequestHandler(server *HTTPServer, request *ServerHTTPRequest) (*responseHandlers, error) {
 	if handlers, exists := server.uriHandlers[request.method]; exists {
 		for _, handler := range handlers {
 			var uriPattern = handler.uriPattern

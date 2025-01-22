@@ -23,7 +23,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
@@ -48,7 +48,7 @@ func TestVersion(t *testing.T) {
 	}
 
 	headerValue = response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
@@ -71,7 +71,7 @@ func TestVersion(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	if response.statusCode != STATUS_NOT_IMPLEMENTED {
+	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
 		t.FailNow()
 	}
 }
@@ -91,7 +91,7 @@ func TestHeadRequests(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 	if response.HasBody() {
@@ -119,7 +119,7 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 	}
 
 	headerValue := response.GetHeader("TestHeader")
-	if response.statusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
 		t.FailNow()
 	}
 
@@ -146,7 +146,7 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	if response.statusCode != STATUS_NOT_IMPLEMENTED {
+	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
 		t.FailNow()
 	}
 

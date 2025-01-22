@@ -25,8 +25,8 @@ func TestClientGet(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	if response.statusCode != STATUS_OK {
-		t.Fatalf("Wrong Status Code: %d\n", response.statusCode)
+	if response.StatusCode != STATUS_OK {
+		t.Fatalf("Wrong Status Code: %d\n", response.StatusCode)
 	}
 
 	value := response.GetHeader("TestHeader")
@@ -59,7 +59,7 @@ func TestClientPost(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	if response.statusCode != STATUS_OK {
+	if response.StatusCode != STATUS_OK {
 		t.Fatalf("Wrong Status code")
 	}
 	value := response.GetHeader("TestHeader")

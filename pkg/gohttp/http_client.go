@@ -13,22 +13,22 @@ import (
 
 var activeConnections map[string]net.Conn = make(map[string]net.Conn)
 
-func GET(request HTTPRequest) (*HTTPResponse, error) {
+func GET(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	request.method = MethodGet
 	return makeRequest(request)
 }
 
-func HEAD(request HTTPRequest) (*HTTPResponse, error) {
+func HEAD(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	request.method = MethodHead
 	return makeRequest(request)
 }
 
-func POST(request HTTPRequest) (*HTTPResponse, error) {
+func POST(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	request.method = MethodPost
 	return makeRequest(request)
 }
 
-func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
+func makeRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	if request.uri.Host == "" {
 		host, ok := request.headers["host"]
 		if !ok {
@@ -65,15 +65,12 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 
 	var responseReader = textproto.NewReader(bufio.NewReader(connection))
 	response, err := parseResponsefromConnection(responseReader)
-	response.conn = connection
 
 	transferEncoding := response.GetHeader("Transfer-Encoding")
 	contentLengthValue := response.GetHeader("Content-Length")
 	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	var responseBody []byte
 	if response.version == "1.1" && transferEncoding == "chunked" {
-		responseBody, err = parseChunkedBody(responseReader, request, response, request.onResponseChunk)
-		response.body = bytes.NewBuffer(responseBody)
+		response.body, err = parseClientChunkedBody(responseReader, connection, response, request.onResponseChunk)
 		if err != nil {
 			return nil, err
 		}

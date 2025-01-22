@@ -9,13 +9,13 @@ import (
 	"testing"
 )
 
-func handleRequest(request HTTPRequest, response *HTTPResponse) {
+func handleRequest(request ServerHTTPRequest, response *ServerHTTPResponse) {
 	response.SetStatus(STATUS_OK)
 	response.SetHeader("TestHeader", "Hello")
 	response.Write([]byte("Hello World!\n"))
 }
 
-func handleEcho(request HTTPRequest, response *HTTPResponse) {
+func handleEcho(request ServerHTTPRequest, response *ServerHTTPResponse) {
 	bodyBuffer := make([]byte, 1024)
 	buffer := new(bytes.Buffer)
 	bodyReader := bytes.NewReader(request.Body)
@@ -33,7 +33,7 @@ func handleEcho(request HTTPRequest, response *HTTPResponse) {
 	response.SetHeader("TestHeader", "Hello")
 }
 
-func handleChunked(request HTTPRequest, response *HTTPResponse) {
+func handleChunked(request ServerHTTPRequest, response *ServerHTTPResponse) {
 
 	file, err := os.Open("testdata/lusiadasTest.txt")
 	if err != nil {
@@ -53,7 +53,7 @@ func handleChunked(request HTTPRequest, response *HTTPResponse) {
 	}
 }
 
-func handleChunk(chunk []byte, request HTTPRequest, response *HTTPResponse) bool {
+func handleChunk(chunk []byte, request ServerHTTPRequest, response *ServerHTTPResponse) bool {
 	response.SetStatus(204)
 	response.SetHeader("CHUNK", "YES")
 
