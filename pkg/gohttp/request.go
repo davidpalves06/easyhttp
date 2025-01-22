@@ -1,7 +1,6 @@
 package gohttp
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -15,13 +14,15 @@ import (
 )
 
 type HTTPRequest struct {
-	method       string
-	uri          *url.URL
-	version      string
-	headers      Headers
-	Body         []byte
-	chunkChannel chan []byte
-	chunked      bool
+	method          string
+	uri             *url.URL
+	version         string
+	headers         Headers
+	Body            []byte
+	chunkChannel    chan []byte
+	chunked         bool
+	connection      *net.Conn
+	onResponseChunk ClientChunkFunction
 }
 
 func (r *HTTPRequest) SetHeader(key string, value string) {
@@ -198,11 +199,11 @@ func parseHeaders(requestReader *textproto.Reader, request *HTTPRequest) {
 	}
 }
 
-func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
+func parseRequestFromConnection(requestReader *textproto.Reader, connection net.Conn) (*HTTPRequest, error) {
 	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	var requestReader = textproto.NewReader(bufio.NewReader(connection))
 	var request *HTTPRequest = &HTTPRequest{
-		headers: make(map[string]string),
+		headers:    make(map[string]string),
+		connection: &connection,
 	}
 	requestLine, err := requestReader.ReadLine()
 	if err != nil {
@@ -216,27 +217,6 @@ func parseRequestFromConnection(connection net.Conn) (*HTTPRequest, error) {
 	parseHeaders(requestReader, request)
 	if request.GetHeader("Host") == "" {
 		return nil, ErrParsing
-	}
-
-	transferEncoding := request.GetHeader("Transfer-Encoding")
-	contentLengthValue := request.GetHeader("Content-Length")
-	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	if request.version == "1.1" && transferEncoding == "chunked" {
-		request.Body, err = parseChunkedBody(requestReader)
-		if err != nil {
-			return nil, err
-		}
-	} else if contentLengthValue != "" {
-		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
-		if err != nil {
-			return nil, ErrParsing
-		}
-		if bodyLength != 0 {
-			request.Body, err = parseBodyWithFullContent(bodyLength, requestReader)
-			if err != nil {
-				return nil, err
-			}
-		}
 	}
 
 	return request, nil

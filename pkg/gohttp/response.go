@@ -1,7 +1,6 @@
 package gohttp
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -61,7 +60,7 @@ func (r *HTTPResponse) SendChunk() (int, error) {
 }
 
 func (r *HTTPResponse) HasBody() bool {
-	return r.body != nil
+	return r.body != nil && r.body.Len() != 0
 }
 
 func (r *HTTPResponse) Read(buffer []byte) (int, error) {
@@ -140,10 +139,23 @@ func (r *HTTPResponse) toBytes() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+func newHTTPResponse(request *HTTPRequest) *HTTPResponse {
+	response := &HTTPResponse{
+		headers:    make(map[string]string),
+		statusCode: STATUS_OK,
+		body:       new(bytes.Buffer),
+		conn:       *request.connection,
+		version:    request.version,
+		method:     request.method,
+	}
+	return response
+}
+
 func newBadRequestResponse() HTTPResponse {
 	badRequestResponse := HTTPResponse{
 		version:    "1.0",
 		statusCode: 400,
+		headers:    make(Headers),
 	}
 	return badRequestResponse
 }
@@ -197,11 +209,9 @@ func parseResponseHeaders(responseReader *textproto.Reader, response *HTTPRespon
 	}
 }
 
-func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
-	var responseReader = textproto.NewReader(bufio.NewReader(connection))
+func parseResponsefromConnection(responseReader *textproto.Reader) (*HTTPResponse, error) {
 	var response = &HTTPResponse{
 		headers: make(Headers),
-		conn:    connection,
 	}
 
 	statusLine, err := responseReader.ReadLine()
@@ -215,32 +225,6 @@ func parseResponsefromConnection(connection net.Conn) (*HTTPResponse, error) {
 	}
 
 	parseResponseHeaders(responseReader, response)
-
-	transferEncoding := response.GetHeader("Transfer-Encoding")
-	contentLengthValue := response.GetHeader("Content-Length")
-	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	var responseBody []byte
-	if response.version == "1.1" && transferEncoding == "chunked" {
-		responseBody, err = parseChunkedBody(responseReader)
-		response.body = bytes.NewBuffer(responseBody)
-		if err != nil {
-			return nil, err
-		}
-	} else if contentLengthValue != "" {
-		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
-		if err != nil {
-			return nil, ErrParsing
-		}
-		if bodyLength != 0 {
-			responseBody, err := parseBodyWithFullContent(bodyLength, responseReader)
-			if err != nil {
-				return nil, err
-			}
-			response.body = bytes.NewBuffer(responseBody)
-		}
-	} else {
-		response.body = nil
-	}
 
 	return response, nil
 }

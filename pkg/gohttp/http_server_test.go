@@ -53,6 +53,13 @@ func handleChunked(request HTTPRequest, response *HTTPResponse) {
 	}
 }
 
+func handleChunk(chunk []byte, request HTTPRequest, response *HTTPResponse) bool {
+	response.SetStatus(204)
+	response.SetHeader("CHUNK", "YES")
+
+	return true
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
@@ -64,11 +71,12 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)
 	server.HandleGET("/chunked", handleChunked)
+	server.HandlePOSTWithOptions("/runafter", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: true})
+	server.HandlePOSTWithOptions("/notrun", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: false})
 	go func() {
 		server.Run()
 	}()
 
-	// Return a function to teardown the test
 	return func(tb testing.TB) {
 		server.Close()
 	}

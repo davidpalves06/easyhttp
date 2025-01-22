@@ -1,9 +1,13 @@
 package gohttp
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"net"
+	"net/textproto"
+	"strconv"
 	"time"
 )
 
@@ -59,7 +63,36 @@ func makeRequest(request HTTPRequest) (*HTTPResponse, error) {
 		request.sendChunks(connection)
 	}
 
-	response, err := parseResponsefromConnection(connection)
+	var responseReader = textproto.NewReader(bufio.NewReader(connection))
+	response, err := parseResponsefromConnection(responseReader)
+	response.conn = connection
+
+	transferEncoding := response.GetHeader("Transfer-Encoding")
+	contentLengthValue := response.GetHeader("Content-Length")
+	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+	var responseBody []byte
+	if response.version == "1.1" && transferEncoding == "chunked" {
+		responseBody, err = parseChunkedBody(responseReader, request, response, request.onResponseChunk)
+		response.body = bytes.NewBuffer(responseBody)
+		if err != nil {
+			return nil, err
+		}
+	} else if contentLengthValue != "" {
+		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil {
+			return nil, ErrParsing
+		}
+		if bodyLength != 0 {
+			responseBody, err := parseBodyWithFullContent(bodyLength, responseReader)
+			if err != nil {
+				return nil, err
+			}
+			response.body = bytes.NewBuffer(responseBody)
+		}
+	} else {
+		response.body = nil
+	}
+
 	if err != nil {
 		return nil, err
 	}

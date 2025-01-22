@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Headers map[string]string
@@ -99,9 +100,9 @@ func isURIMatch(requestPath string, pattern string) bool {
 	return j == len(requestParts)
 }
 
-func parseBodyWithFullContent(bodyLength int64, requestReader *textproto.Reader) ([]byte, error) {
+func parseBodyWithFullContent(bodyLength int64, bodyReader *textproto.Reader) ([]byte, error) {
 	var bodyBuffer []byte = make([]byte, bodyLength)
-	readBodyLength, err := io.ReadFull(requestReader.R, bodyBuffer)
+	readBodyLength, err := io.ReadFull(bodyReader.R, bodyBuffer)
 	if err != nil {
 		return nil, err
 	}
@@ -109,13 +110,14 @@ func parseBodyWithFullContent(bodyLength int64, requestReader *textproto.Reader)
 	return bodyBuffer[:readBodyLength], nil
 }
 
-func parseChunkedBody(requestReader *textproto.Reader) ([]byte, error) {
+func parseChunkedBody[T ServerChunkFunction | ClientChunkFunction](bodyReader *textproto.Reader, request HTTPRequest, response *HTTPResponse, onChunk T) ([]byte, error) {
 	var bodyBytes *bytes.Buffer = new(bytes.Buffer)
 	var isFinished = false
 	for !isFinished {
-		firstLine, err := requestReader.ReadLine()
+		response.conn.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+		firstLine, err := bodyReader.ReadLine()
 		for err != nil || firstLine == "" {
-			firstLine, err = requestReader.ReadLine()
+			firstLine, err = bodyReader.ReadLine()
 			if err != nil {
 				return nil, err
 			}
@@ -127,15 +129,25 @@ func parseChunkedBody(requestReader *textproto.Reader) ([]byte, error) {
 		}
 		if chunkLength != 0 {
 			var chunkBuffer = make([]byte, chunkLength)
-			read, err := io.ReadFull(requestReader.R, chunkBuffer)
+			read, err := io.ReadFull(bodyReader.R, chunkBuffer)
 			if err != nil {
 				return nil, err
 			}
-			bodyBytes.Write(chunkBuffer[:read])
+			if onChunk != nil {
+				switch chunkFunction := any(onChunk).(type) {
+				case ServerChunkFunction:
+					isFinished = !chunkFunction(chunkBuffer[:read], request, response)
+				case ClientChunkFunction:
+					isFinished = !chunkFunction(chunkBuffer[:read], response)
+				}
+				bodyBytes.Reset()
+			} else {
+				bodyBytes.Write(chunkBuffer[:read])
+			}
 		} else {
 			isFinished = true
 		}
-		requestReader.ReadLine()
+		bodyReader.ReadLine()
 	}
 	return bodyBytes.Bytes(), nil
 }

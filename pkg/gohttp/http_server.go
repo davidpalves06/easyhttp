@@ -1,9 +1,13 @@
 package gohttp
 
 import (
-	"bytes"
+	"bufio"
+	"errors"
 	"net"
+	"net/textproto"
+	"strconv"
 	"sync"
+	"time"
 )
 
 type HTTPServer struct {
@@ -15,10 +19,18 @@ type HTTPServer struct {
 }
 
 type ResponseFunction func(HTTPRequest, *HTTPResponse)
+type ServerChunkFunction func([]byte, HTTPRequest, *HTTPResponse) bool
+type ClientChunkFunction func([]byte, *HTTPResponse) bool
+
+type HandlerOptions struct {
+	onChunk        ServerChunkFunction
+	runAfterChunks bool
+}
 
 type responseHandlers struct {
 	uriPattern string
 	handler    ResponseFunction
+	options    HandlerOptions
 }
 
 func (s *HTTPServer) addHandlerForMethod(handler *responseHandlers, method string) {
@@ -35,6 +47,17 @@ func (s *HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFuncti
 	var handler *responseHandlers = new(responseHandlers)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
+	handler.options.onChunk = nil
+
+	s.addHandlerForMethod(handler, MethodGet)
+	s.addHandlerForMethod(handler, MethodHead)
+}
+
+func (s *HTTPServer) HandleGETWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options = options
 
 	s.addHandlerForMethod(handler, MethodGet)
 	s.addHandlerForMethod(handler, MethodHead)
@@ -44,6 +67,16 @@ func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunct
 	var handler *responseHandlers = new(responseHandlers)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
+	handler.options.onChunk = nil
+
+	s.addHandlerForMethod(handler, MethodPost)
+}
+
+func (s *HTTPServer) HandlePOSTWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options = options
 
 	s.addHandlerForMethod(handler, MethodPost)
 }
@@ -53,7 +86,8 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	defer server.waitGroup.Done()
 	var keepAlive = true
 	for server.running && keepAlive {
-		request, err := parseRequestFromConnection(connection)
+		var requestReader = textproto.NewReader(bufio.NewReader(connection))
+		request, err := parseRequestFromConnection(requestReader, connection)
 		if err != nil {
 			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
 				badRequestResponse := newBadRequestResponse()
@@ -63,30 +97,51 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 			return
 		}
 
-		response := &HTTPResponse{
-			headers:    make(map[string]string),
-			statusCode: STATUS_OK,
-			body:       new(bytes.Buffer),
-			conn:       connection,
-			version:    request.version,
-			method:     request.method,
-		}
+		response := newHTTPResponse(request)
 
-		if handlers, exists := server.uriHandlers[request.method]; exists {
-			var handled = false
-			for _, handler := range handlers {
-				var uriPattern = handler.uriPattern
-				if isURIMatch(request.uri.Path, uriPattern) {
-					handler.handler(*request, response)
-					handled = true
-					break
+		handler, err := getRequestHandler(server, request)
+		if err != nil {
+			response.statusCode = STATUS_NOT_IMPLEMENTED
+		} else {
+			transferEncoding := request.GetHeader("Transfer-Encoding")
+			contentLengthValue := request.GetHeader("Content-Length")
+			connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+			var err error
+			if request.version == "1.1" && transferEncoding == "chunked" {
+				request.Body, err = parseChunkedBody(requestReader, *request, response, handler.options.onChunk)
+				if err != nil {
+					if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+						badRequestResponse := newBadRequestResponse()
+						responseBytes, _ := badRequestResponse.toBytes()
+						connection.Write(responseBytes)
+					}
+					return
+				}
+			} else if contentLengthValue != "" {
+
+				var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
+				if err != nil {
+					badRequestResponse := newBadRequestResponse()
+					responseBytes, _ := badRequestResponse.toBytes()
+					connection.Write(responseBytes)
+					return
+				}
+				if bodyLength != 0 {
+					request.Body, err = parseBodyWithFullContent(bodyLength, requestReader)
+					if err != nil {
+						if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+							badRequestResponse := newBadRequestResponse()
+							responseBytes, _ := badRequestResponse.toBytes()
+							connection.Write(responseBytes)
+						}
+						return
+					}
 				}
 			}
-			if !handled {
-				response.statusCode = STATUS_NOT_IMPLEMENTED
+
+			if handler.options.onChunk == nil || handler.options.runAfterChunks {
+				handler.handler(*request, response)
 			}
-		} else {
-			response.statusCode = STATUS_NOT_IMPLEMENTED
 		}
 
 		if request.method == MethodHead {
@@ -106,6 +161,20 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 			connection.Write([]byte("0 \r\n\r\n"))
 		}
 		keepAlive = !isClosingRequest(request)
+	}
+}
+
+func getRequestHandler(server *HTTPServer, request *HTTPRequest) (*responseHandlers, error) {
+	if handlers, exists := server.uriHandlers[request.method]; exists {
+		for _, handler := range handlers {
+			var uriPattern = handler.uriPattern
+			if isURIMatch(request.uri.Path, uriPattern) {
+				return handler, nil
+			}
+		}
+		return nil, errors.New("handler not implemented")
+	} else {
+		return nil, errors.New("handler not implemented")
 	}
 }
 
