@@ -2,10 +2,13 @@ package gohttp
 
 import (
 	"errors"
+	"net"
 	"net/textproto"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type ServerHTTPRequest struct {
@@ -127,4 +130,30 @@ func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPReq
 	}
 
 	return request, nil
+}
+
+func parseRequestBody(request *ServerHTTPRequest, connection net.Conn, requestReader *textproto.Reader, response *ServerHTTPResponse, onChunk ServerChunkFunction) error {
+	transferEncoding := request.GetHeader("Transfer-Encoding")
+	contentLengthValue := request.GetHeader("Content-Length")
+	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+	var err error
+	if request.version == "1.1" && transferEncoding == "chunked" {
+		request.Body, err = parseServerChunkedBody(requestReader, connection, request, response, onChunk)
+		if err != nil {
+			return err
+		}
+	} else if contentLengthValue != "" {
+
+		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil {
+			return err
+		}
+		if bodyLength != 0 {
+			request.Body, err = parseBodyWithFullContent(bodyLength, requestReader)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

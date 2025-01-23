@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"net"
 	"net/textproto"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ClientHTTPResponse struct {
@@ -111,4 +113,32 @@ func parseResponsefromConnection(responseReader *textproto.Reader) (*ClientHTTPR
 	parseResponseHeaders(responseReader, response)
 
 	return response, nil
+}
+
+func parseResponseBody(response *ClientHTTPResponse, connection net.Conn, responseReader *textproto.Reader, onResponseChunk ClientChunkFunction) error {
+	transferEncoding := response.GetHeader("Transfer-Encoding")
+	contentLengthValue := response.GetHeader("Content-Length")
+	var err error
+	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
+	if response.version == "1.1" && transferEncoding == "chunked" {
+		response.body, err = parseClientChunkedBody(responseReader, connection, response, onResponseChunk)
+		if err != nil {
+			return err
+		}
+	} else if contentLengthValue != "" {
+		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
+		if err != nil {
+			return err
+		}
+		if bodyLength != 0 {
+			responseBody, err := parseBodyWithFullContent(bodyLength, responseReader)
+			if err != nil {
+				return err
+			}
+			response.body = bytes.NewBuffer(responseBody)
+		}
+	} else {
+		response.body = nil
+	}
+	return nil
 }

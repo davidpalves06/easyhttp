@@ -2,12 +2,10 @@ package gohttp
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"io"
 	"net"
 	"net/textproto"
-	"strconv"
 	"time"
 )
 
@@ -65,34 +63,15 @@ func makeRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 
 	var responseReader = textproto.NewReader(bufio.NewReader(connection))
 	response, err := parseResponsefromConnection(responseReader)
-
-	transferEncoding := response.GetHeader("Transfer-Encoding")
-	contentLengthValue := response.GetHeader("Content-Length")
-	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	if response.version == "1.1" && transferEncoding == "chunked" {
-		response.body, err = parseClientChunkedBody(responseReader, connection, response, request.onResponseChunk)
-		if err != nil {
-			return nil, err
-		}
-	} else if contentLengthValue != "" {
-		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
-		if err != nil {
-			return nil, ErrParsing
-		}
-		if bodyLength != 0 {
-			responseBody, err := parseBodyWithFullContent(bodyLength, responseReader)
-			if err != nil {
-				return nil, err
-			}
-			response.body = bytes.NewBuffer(responseBody)
-		}
-	} else {
-		response.body = nil
-	}
-
 	if err != nil {
 		return nil, err
 	}
+
+	err = parseResponseBody(response, connection, responseReader, request.onResponseChunk)
+	if err != nil {
+		return nil, err
+	}
+
 	if isClosingRequest(&request) {
 		connection.Close()
 		delete(activeConnections, request.uri.Host)

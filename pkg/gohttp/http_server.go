@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"net/textproto"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -90,11 +89,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 		request, err := parseRequestFromConnection(requestReader)
 		if err != nil {
-			if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-				badRequestResponse := newBadRequestResponse()
-				responseBytes, _ := badRequestResponse.toBytes()
-				connection.Write(responseBytes)
-			}
+			sendBadRequestIfNotTimeout(err, connection)
 			return
 		}
 
@@ -104,40 +99,10 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		if err != nil {
 			response.statusCode = STATUS_NOT_IMPLEMENTED
 		} else {
-			transferEncoding := request.GetHeader("Transfer-Encoding")
-			contentLengthValue := request.GetHeader("Content-Length")
-			connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-			var err error
-			if request.version == "1.1" && transferEncoding == "chunked" {
-				request.Body, err = parseServerChunkedBody(requestReader, connection, request, response, handler.options.onChunk)
-				if err != nil {
-					if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-						badRequestResponse := newBadRequestResponse()
-						responseBytes, _ := badRequestResponse.toBytes()
-						connection.Write(responseBytes)
-					}
-					return
-				}
-			} else if contentLengthValue != "" {
-
-				var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
-				if err != nil {
-					badRequestResponse := newBadRequestResponse()
-					responseBytes, _ := badRequestResponse.toBytes()
-					connection.Write(responseBytes)
-					return
-				}
-				if bodyLength != 0 {
-					request.Body, err = parseBodyWithFullContent(bodyLength, requestReader)
-					if err != nil {
-						if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-							badRequestResponse := newBadRequestResponse()
-							responseBytes, _ := badRequestResponse.toBytes()
-							connection.Write(responseBytes)
-						}
-						return
-					}
-				}
+			err := parseRequestBody(request, connection, requestReader, response, handler.options.onChunk)
+			if err != nil {
+				sendBadRequestIfNotTimeout(err, connection)
+				return
 			}
 
 			if handler.options.onChunk == nil || handler.options.runAfterChunks {
@@ -152,9 +117,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		if !response.chunked {
 			responseBytes, err := response.toBytes()
 			if err != nil {
-				badRequestResponse := newBadRequestResponse()
-				responseBytes, _ := badRequestResponse.toBytes()
-				connection.Write(responseBytes)
+				sendBadRequestIfNotTimeout(err, connection)
 				return
 			}
 			connection.Write(responseBytes)
@@ -162,6 +125,14 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 			connection.Write([]byte("0 \r\n\r\n"))
 		}
 		keepAlive = !isClosingRequest(request)
+	}
+}
+
+func sendBadRequestIfNotTimeout(err error, connection net.Conn) {
+	if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
+		badRequestResponse := newBadRequestResponse()
+		responseBytes, _ := badRequestResponse.toBytes()
+		connection.Write(responseBytes)
 	}
 }
 
