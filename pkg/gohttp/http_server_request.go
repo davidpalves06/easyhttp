@@ -47,6 +47,14 @@ func (r *ServerHTTPRequest) Version() string {
 	return r.version
 }
 
+func (r *ServerHTTPRequest) Path() string {
+	return r.uri.Path
+}
+
+func (r *ServerHTTPRequest) QueryValues() url.Values {
+	return r.uri.Query()
+}
+
 func (r *ServerHTTPRequest) SetVersion(version string) error {
 	if slices.Contains(validVersions, version) {
 		r.version = version

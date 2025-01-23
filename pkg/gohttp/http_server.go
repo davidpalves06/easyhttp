@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/textproto"
+	"strings"
 	"sync"
 	"time"
 )
@@ -30,6 +31,22 @@ type responseHandlers struct {
 	uriPattern string
 	handler    ResponseFunction
 	options    HandlerOptions
+}
+
+func FileServer(filePrefix string) ResponseFunction {
+	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
+		response.statusCode = STATUS_OK
+		var requestPath string = request.Path()
+		splittedPath := strings.Split(requestPath, "/")
+		filePrefix, _ = strings.CutSuffix(filePrefix, "/")
+
+		fileNameBuilder := new(strings.Builder)
+		fileNameBuilder.WriteString(filePrefix)
+		fileNameBuilder.WriteString("/")
+		fileNameBuilder.WriteString(splittedPath[len(splittedPath)-1])
+
+		response.SendFile(fileNameBuilder.String())
+	}
 }
 
 func (s *HTTPServer) addHandlerForMethod(handler *responseHandlers, method string) {

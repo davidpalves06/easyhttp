@@ -71,6 +71,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)
 	server.HandleGET("/chunked", handleChunked)
+	server.HandleGET("/testdata/lusiadasTest.txt", FileServer("testdata"))
 	server.HandlePOSTWithOptions("/runafter", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: true})
 	server.HandlePOSTWithOptions("/notrun", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: false})
 	go func() {

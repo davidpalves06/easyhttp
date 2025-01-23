@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,12 +21,25 @@ type ServerHTTPResponse struct {
 	body        *bytes.Buffer
 	chunkWriter io.Writer
 	chunked     bool
-	//TODO: CHECK HOW TO DO CHUNKED HEAD RESPONSE
-	method string
+	method      string
 }
 
 func (r *ServerHTTPResponse) Write(p []byte) (n int, err error) {
 	return r.body.Write(p)
+}
+
+func (r *ServerHTTPResponse) SendFile(fileName string) error {
+	file, err := os.Open(fileName)
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer file.Close()
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		fmt.Println(err)
+	}
+	r.body.Write(fileBytes)
+	return nil
 }
 
 func (r *ServerHTTPResponse) SendChunk() (int, error) {

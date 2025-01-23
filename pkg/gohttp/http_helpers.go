@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type HTTPRequest interface {
+type httpRequest interface {
 	SetHeader(key string, value string)
 	GetHeader(key string) string
 	Version() string
@@ -193,7 +193,7 @@ func parseClientChunkedBody(bodyReader *textproto.Reader, connection net.Conn, r
 	return bodyBytes, nil
 }
 
-func isClosingRequest(request HTTPRequest) bool {
+func isClosingRequest(request httpRequest) bool {
 	connection := request.GetHeader("Connection")
 	if request.Version() == "1.0" {
 		return connection != "keep-alive"

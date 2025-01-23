@@ -152,3 +152,41 @@ func TestBiggerContentLength(t *testing.T) {
 		t.Fatalf("Bad body")
 	}
 }
+
+func TestServerFileUpload(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+
+	request, err := NewRequest("http://localhost:1234/testdata/lusiadasTest.txt")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	request.SetVersion("1.0")
+	response, err := GET(request)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if response.StatusCode != STATUS_OK {
+		t.FailNow()
+	}
+
+	headerLength := response.GetHeader("Content-Length")
+	if headerLength != "362128" {
+		t.Fatalf("Body length is incorrect")
+	}
+
+	bodyBuffer := make([]byte, 1024)
+	var totalRead int
+	for {
+		read, err := response.Read(bodyBuffer)
+		if err != nil {
+			break
+		}
+		totalRead += read
+	}
+
+	if totalRead != 362128 {
+		t.Fatalf("Bad body")
+	}
+}
