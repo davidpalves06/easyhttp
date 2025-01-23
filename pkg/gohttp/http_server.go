@@ -50,6 +50,13 @@ func FileServer(filePrefix string) ResponseFunction {
 	}
 }
 
+func PermaRedirect(redirectURI string) ResponseFunction {
+	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
+		response.SetStatus(STATUS_MOVED_PERMANENTLY)
+		response.SetHeader("Location", redirectURI)
+	}
+}
+
 func (s *HTTPServer) addHandlerForMethod(handler *responseHandlers, method string) {
 
 	if currentHandlers, exists := s.uriHandlers[method]; exists {
