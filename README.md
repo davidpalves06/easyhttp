@@ -1,7 +1,7 @@
 # WebSocket
 Go HTTP implementation as defined in protocol RFC 9110.
 
-//TODO: SERVE FILES
-//TODO: PIPELINE
-//TODO: HTTPS
+//TODO: REDIRECT
+//TODO: COOKIES
+//TODO: MULTI-HEADERS
 //TODO: HTTP2.0

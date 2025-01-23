@@ -8,6 +8,8 @@ import (
 )
 
 func TestClientGet(t *testing.T) {
+	client := NewHTTPClient()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("TestHeader", "Hello")
 		w.WriteHeader(STATUS_OK)
@@ -20,7 +22,7 @@ func TestClientGet(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	response, err := GET(request)
+	response, err := client.GET(request)
 	if err != nil || response == nil {
 		t.Fatal(err.Error())
 	}
@@ -41,6 +43,8 @@ func TestClientGet(t *testing.T) {
 }
 
 func TestClientPost(t *testing.T) {
+	client := NewHTTPClient()
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		body, _ := io.ReadAll(r.Body)
@@ -54,7 +58,7 @@ func TestClientPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

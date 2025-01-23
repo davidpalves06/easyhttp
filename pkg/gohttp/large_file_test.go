@@ -10,6 +10,7 @@ import (
 func TestLargeFiles(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	file, err := os.Open("testdata/lusiadasTest.txt")
 	if err != nil {
@@ -26,7 +27,7 @@ func TestLargeFiles(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	request.SetVersion("1.0")
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -57,6 +58,7 @@ func TestLargeFiles(t *testing.T) {
 func TestSmallerContentLength(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	file, err := os.Open("testdata/lusiadasTest.txt")
 	if err != nil {
@@ -75,7 +77,7 @@ func TestSmallerContentLength(t *testing.T) {
 	request.SetVersion("1.0")
 
 	request.SetHeader("Content-Length", "10000")
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -108,6 +110,7 @@ func TestBiggerContentLength(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
 
+	client := NewHTTPClient()
 	file, err := os.Open("testdata/lusiadasTest.txt")
 	if err != nil {
 		fmt.Println(err)
@@ -124,7 +127,7 @@ func TestBiggerContentLength(t *testing.T) {
 	}
 	request.SetVersion("1.0")
 	request.SetHeader("Content-Length", "1000000")
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -156,13 +159,14 @@ func TestBiggerContentLength(t *testing.T) {
 func TestServerFileUpload(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequest("http://localhost:1234/testdata/lusiadasTest.txt")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	request.SetVersion("1.0")
-	response, err := GET(request)
+	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

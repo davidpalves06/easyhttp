@@ -10,6 +10,7 @@ import (
 func TestChunkedTransfer(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequestWithBody("http://localhost:1234/large", []byte("This should be ignored"))
 	if err != nil {
@@ -37,7 +38,7 @@ func TestChunkedTransfer(t *testing.T) {
 
 	}()
 
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -67,13 +68,14 @@ func TestChunkedTransfer(t *testing.T) {
 func TestChunkedResponse(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequest("http://localhost:1234/chunked")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	request.SetHeader("Connection", "close")
-	response, err := GET(request)
+	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -99,6 +101,7 @@ func TestChunkedResponse(t *testing.T) {
 func TestChunkedServerHandlingWithResponseAfterChunks(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequestWithBody("http://localhost:1234/runafter", []byte("This should be ignored"))
 	if err != nil {
@@ -126,7 +129,7 @@ func TestChunkedServerHandlingWithResponseAfterChunks(t *testing.T) {
 
 	}()
 
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -148,6 +151,7 @@ func TestChunkedServerHandlingWithResponseAfterChunks(t *testing.T) {
 func TestChunkedServerHandlingWithoutResponseAfterChunks(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequestWithBody("http://localhost:1234/notrun", []byte("This should be ignored"))
 	if err != nil {
@@ -174,7 +178,7 @@ func TestChunkedServerHandlingWithoutResponseAfterChunks(t *testing.T) {
 		request.Done()
 	}()
 
-	response, err := POST(request)
+	response, err := client.POST(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -201,6 +205,8 @@ func handleResponseChunk(chunk []byte, response *ClientHTTPResponse) bool {
 func TestChunkedResponseWithHandlingOnEachChunk(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
+
 	total = 0
 	request, err := NewRequest("http://localhost:1234/chunked")
 	if err != nil {
@@ -208,7 +214,7 @@ func TestChunkedResponseWithHandlingOnEachChunk(t *testing.T) {
 	}
 	request.SetHeader("Connection", "close")
 	request.onResponseChunk = handleResponseChunk
-	response, err := GET(request)
+	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

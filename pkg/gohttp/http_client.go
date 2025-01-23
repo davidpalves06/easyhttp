@@ -2,6 +2,7 @@ package gohttp
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net"
@@ -9,24 +10,33 @@ import (
 	"time"
 )
 
-var activeConnections map[string]net.Conn = make(map[string]net.Conn)
+type httpClient struct {
+	activeConnections map[string]net.Conn
+	TLSConfig         *tls.Config
+}
 
-func GET(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+func NewHTTPClient() httpClient {
+	return httpClient{
+		activeConnections: make(map[string]net.Conn),
+	}
+}
+
+func (c *httpClient) GET(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	request.method = MethodGet
-	return makeRequest(request)
+	return c.sendRequest(request)
 }
 
-func HEAD(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+func (c *httpClient) HEAD(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	request.method = MethodHead
-	return makeRequest(request)
+	return c.sendRequest(request)
 }
 
-func POST(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+func (c *httpClient) POST(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	request.method = MethodPost
-	return makeRequest(request)
+	return c.sendRequest(request)
 }
 
-func makeRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	if request.uri.Host == "" {
 		host, ok := request.headers["host"]
 		if !ok {
@@ -40,11 +50,18 @@ func makeRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	var connection net.Conn
 	var err error
 
-	connection, exists := activeConnections[request.uri.Host]
+	connection, exists := c.activeConnections[request.uri.Host]
 	if !exists || !checkIfConnectionIsStillOpen(connection) {
-		connection, err = net.Dial("tcp", request.uri.Host)
-		if err != nil {
-			return nil, err
+		if request.uri.Scheme == "https" {
+			connection, err = tls.Dial("tcp", request.uri.Host, c.TLSConfig)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			connection, err = net.Dial("tcp", request.uri.Host)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -74,9 +91,9 @@ func makeRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 
 	if isClosingRequest(&request) {
 		connection.Close()
-		delete(activeConnections, request.uri.Host)
+		delete(c.activeConnections, request.uri.Host)
 	} else {
-		activeConnections[request.uri.Host] = connection
+		c.activeConnections[request.uri.Host] = connection
 	}
 	return response, nil
 }

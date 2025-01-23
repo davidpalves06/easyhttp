@@ -8,13 +8,14 @@ import (
 func TestVersion(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequest("http://localhost:1234/path")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	request.version = "1.0"
-	response, err := GET(request)
+	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -38,7 +39,7 @@ func TestVersion(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	request.version = "1.1"
-	response, err = GET(request)
+	response, err = client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -63,7 +64,7 @@ func TestVersion(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	request.version = "2.0"
-	response, err = GET(request)
+	response, err = client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -79,13 +80,14 @@ func TestVersion(t *testing.T) {
 func TestHeadRequests(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequest("http://localhost:1234/path")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	request.headers["Connection"] = "close"
-	response, err := HEAD(request)
+	response, err := client.HEAD(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -103,13 +105,14 @@ func TestHeadRequests(t *testing.T) {
 func TestServerClosedPermanentConnection(t *testing.T) {
 	tearDown := setupServer(t)
 	defer tearDown(t)
+	client := NewHTTPClient()
 
 	request, err := NewRequest("http://localhost:1234/")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	request.version = "1.1"
-	response, err := GET(request)
+	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -138,7 +141,7 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	request.version = "2.0"
-	response, err = GET(request)
+	response, err = client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

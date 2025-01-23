@@ -2,6 +2,7 @@ package gohttp
 
 import (
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"net"
 	"net/textproto"
@@ -192,6 +193,18 @@ func (s *HTTPServer) Close() error {
 
 func NewHTTPServer(address string) (*HTTPServer, error) {
 	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, err
+	}
+	return &HTTPServer{
+		address:     address,
+		listener:    listener,
+		uriHandlers: make(map[string][]*responseHandlers),
+	}, nil
+}
+
+func NewTLSHTTPServer(address string, config *tls.Config) (*HTTPServer, error) {
+	listener, err := tls.Listen("tcp", address, config)
 	if err != nil {
 		return nil, err
 	}
