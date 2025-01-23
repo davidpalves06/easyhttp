@@ -60,6 +60,16 @@ func handleChunk(chunk []byte, request ServerHTTPRequest, response *ServerHTTPRe
 	return true
 }
 
+func handleRedirect(request ServerHTTPRequest, response *ServerHTTPResponse) {
+	response.SetStatus(STATUS_MOVED_PERMANENTLY)
+	response.SetHeader("Location", "http://localhost:1234/path")
+}
+
+func handleInfiniteRedirect(request ServerHTTPRequest, response *ServerHTTPResponse) {
+	response.SetStatus(STATUS_MOVED_PERMANENTLY)
+	response.SetHeader("Location", "http://localhost:1234/infinite/redirect")
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
@@ -71,6 +81,8 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)
 	server.HandleGET("/chunked", handleChunked)
+	server.HandleGET("/redirect", handleRedirect)
+	server.HandleGET("/infinite/redirect", handleInfiniteRedirect)
 	server.HandleGET("/testdata/lusiadasTest.txt", FileServer("testdata"))
 	server.HandlePOSTWithOptions("/runafter", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: true})
 	server.HandlePOSTWithOptions("/notrun", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: false})

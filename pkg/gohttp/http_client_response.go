@@ -1,6 +1,7 @@
 package gohttp
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"io"
@@ -55,6 +56,20 @@ func (r *ClientHTTPResponse) ExistsHeader(key string) bool {
 
 func (r *ClientHTTPResponse) Headers() Headers {
 	return r.headers
+}
+
+func parseResponse(connection net.Conn, request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+	var responseReader = textproto.NewReader(bufio.NewReader(connection))
+	response, err := parseResponsefromConnection(responseReader)
+	if err != nil {
+		return nil, err
+	}
+
+	err = parseResponseBody(response, connection, responseReader, request.onResponseChunk)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func parseResponseStatusLine(statusLine string, response *ClientHTTPResponse) error {

@@ -1,23 +1,24 @@
 package gohttp
 
 import (
-	"bufio"
 	"crypto/tls"
 	"errors"
 	"io"
 	"net"
-	"net/textproto"
+	"net/url"
 	"time"
 )
 
 type httpClient struct {
 	activeConnections map[string]net.Conn
 	TLSConfig         *tls.Config
+	MaxRedirects      uint8
 }
 
 func NewHTTPClient() httpClient {
 	return httpClient{
 		activeConnections: make(map[string]net.Conn),
+		MaxRedirects:      10,
 	}
 }
 
@@ -37,65 +38,89 @@ func (c *httpClient) POST(request ClientHTTPRequest) (*ClientHTTPResponse, error
 }
 
 func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
-	if request.uri.Host == "" {
-		host, ok := request.headers["host"]
-		if !ok {
-			return nil, errors.New("no host to send request. Use absolute URI or host header")
+	var response *ClientHTTPResponse
+	var redirects uint8 = 0
+	var isRedirect = true
+	for redirects < c.MaxRedirects && isRedirect {
+		if request.uri.Host == "" {
+			host, ok := request.headers["host"]
+			if !ok {
+				return nil, errors.New("no host to send request. Use absolute URI or host header")
+			}
+			request.uri.Host = host
 		}
-		request.uri.Host = host
-	}
 
-	request.SetHeader("Host", request.uri.Host)
+		request.SetHeader("Host", request.uri.Host)
 
-	var connection net.Conn
-	var err error
+		var connection net.Conn
+		var err error
 
-	connection, exists := c.activeConnections[request.uri.Host]
-	if !exists || !checkIfConnectionIsStillOpen(connection) {
-		if request.uri.Scheme == "https" {
-			connection, err = tls.Dial("tcp", request.uri.Host, c.TLSConfig)
-			if err != nil {
-				return nil, err
+		connection, exists := c.activeConnections[request.uri.Host]
+		if !exists || !checkIfConnectionIsStillOpen(connection) {
+			if request.uri.Scheme == "https" {
+				connection, err = tls.Dial("tcp", request.uri.Host, c.TLSConfig)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				connection, err = net.Dial("tcp", request.uri.Host)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		requestBytes, err := request.toBytes()
+		if err != nil {
+			return nil, err
+		}
+		_, err = connection.Write(requestBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		if request.chunked {
+			request.sendChunks(connection)
+		}
+
+		response, err = parseResponse(connection, request)
+		if err != nil {
+			return nil, err
+		}
+
+		if isClosingRequest(&request) {
+			connection.Close()
+			delete(c.activeConnections, request.uri.Host)
+		} else {
+			c.activeConnections[request.uri.Host] = connection
+		}
+
+		if isRedirected(response) {
+			var location = response.GetHeader("Location")
+			uri, _ := url.ParseRequestURI(location)
+			if uri.Host != "" {
+				err = request.SetURI(location)
+				if err != nil {
+					return nil, errors.New("bad redirect location")
+				}
+			} else {
+				request.uri.Path = location
 			}
 		} else {
-			connection, err = net.Dial("tcp", request.uri.Host)
-			if err != nil {
-				return nil, err
-			}
+			isRedirect = false
 		}
+		redirects++
 	}
 
-	requestBytes, err := request.toBytes()
-	if err != nil {
-		return nil, err
-	}
-	_, err = connection.Write(requestBytes)
-	if err != nil {
-		return nil, err
+	if redirects == c.MaxRedirects {
+		return nil, errors.New("too many redirects")
 	}
 
-	if request.chunked {
-		request.sendChunks(connection)
-	}
-
-	var responseReader = textproto.NewReader(bufio.NewReader(connection))
-	response, err := parseResponsefromConnection(responseReader)
-	if err != nil {
-		return nil, err
-	}
-
-	err = parseResponseBody(response, connection, responseReader, request.onResponseChunk)
-	if err != nil {
-		return nil, err
-	}
-
-	if isClosingRequest(&request) {
-		connection.Close()
-		delete(c.activeConnections, request.uri.Host)
-	} else {
-		c.activeConnections[request.uri.Host] = connection
-	}
 	return response, nil
+}
+
+func isRedirected(response *ClientHTTPResponse) bool {
+	return response.StatusCode >= 300 && response.StatusCode < 400
 }
 
 func checkIfConnectionIsStillOpen(connection net.Conn) bool {
