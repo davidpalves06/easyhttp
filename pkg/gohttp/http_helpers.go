@@ -14,12 +14,13 @@ import (
 
 type httpRequest interface {
 	SetHeader(key string, value string)
-	GetHeader(key string) string
+	GetHeader(key string) []string
 	Version() string
 	SetVersion(version string) error
+	HasHeaderValue(key string, value string) bool
 }
 
-type Headers map[string]string
+type Headers map[string][]string
 
 const softwareName = "GoHTTP 1.0"
 const (
@@ -194,10 +195,9 @@ func parseClientChunkedBody(bodyReader *textproto.Reader, connection net.Conn, r
 }
 
 func isClosingRequest(request httpRequest) bool {
-	connection := request.GetHeader("Connection")
 	if request.Version() == "1.0" {
-		return connection != "keep-alive"
+		return !request.HasHeaderValue("Connection", "keep-alive")
 	} else {
-		return connection == "close"
+		return request.HasHeaderValue("Connection", "close")
 	}
 }

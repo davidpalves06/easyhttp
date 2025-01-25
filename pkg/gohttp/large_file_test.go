@@ -32,12 +32,11 @@ func TestLargeFiles(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
-	headerLength := response.GetHeader("Content-Length")
-	if headerLength != "362128" {
+
+	if !response.HasHeaderValue("Content-Length", "362128") {
 		t.Fatalf("Body length is incorrect")
 	}
 
@@ -82,13 +81,11 @@ func TestSmallerContentLength(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 
-	headerLength := response.GetHeader("Content-Length")
-	if headerLength != "362128" {
+	if !response.HasHeaderValue("Content-Length", "362128") {
 		t.Fatalf("Body length is incorrect")
 	}
 
@@ -132,13 +129,11 @@ func TestBiggerContentLength(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 
-	headerLength := response.GetHeader("Content-Length")
-	if headerLength != "362128" {
+	if !response.HasHeaderValue("Content-Length", "362128") {
 		t.Fatalf("Body length is incorrect")
 	}
 
@@ -175,8 +170,7 @@ func TestServerFileUpload(t *testing.T) {
 		t.FailNow()
 	}
 
-	headerLength := response.GetHeader("Content-Length")
-	if headerLength != "362128" {
+	if !response.HasHeaderValue("Content-Length", "362128") {
 		t.Fatalf("Body length is incorrect")
 	}
 

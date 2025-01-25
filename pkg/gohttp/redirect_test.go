@@ -21,8 +21,7 @@ func TestRedirects(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 

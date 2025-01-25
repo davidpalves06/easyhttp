@@ -42,12 +42,11 @@ func TestChunkedTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
-		t.FailNow()
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
+		t.Fatalf("Status Code or Header Wrong")
 	}
-	headerLength := response.GetHeader("Content-Length")
-	if headerLength != "362128" {
+	headerLengthHeader := response.GetHeader("Content-Length")
+	if headerLengthHeader[len(headerLengthHeader)-1] != "362128" {
 		t.Fatalf("Body length is incorrect")
 	}
 
@@ -79,8 +78,7 @@ func TestChunkedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.Fatalf("Wrong status or header")
 	}
 
@@ -133,11 +131,8 @@ func TestChunkedServerHandlingWithResponseAfterChunks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.Fatalf("Wrong status or header")
 	}
 
@@ -185,8 +180,7 @@ func TestChunkedServerHandlingWithoutResponseAfterChunks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_NO_CONTENT || headerValue != "" {
+	if response.StatusCode != STATUS_NO_CONTENT || response.GetHeader("TestHeader") != nil {
 		t.Fatalf("Wrong status or header")
 	}
 
@@ -218,8 +212,7 @@ func TestChunkedResponseWithHandlingOnEachChunk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.Fatalf("Wrong status or header")
 	}
 

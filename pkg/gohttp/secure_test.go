@@ -96,9 +96,8 @@ func TestHTTPSClient(t *testing.T) {
 		t.Fatalf("Wrong Status Code: %d\n", response.StatusCode)
 	}
 
-	value := response.GetHeader("TestHeader")
-	if value != "Hello" {
-		t.Fatalf("Wrong Header : %v\n", value)
+	if !response.HasHeaderValue("TestHeader", "Hello") {
+		t.Fatalf("Wrong Header\n")
 	}
 	bodyBuffer := make([]byte, 1024)
 	bodyLength, _ := response.Read(bodyBuffer)
@@ -126,8 +125,7 @@ func TestHTTPSClientServer(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 
@@ -151,8 +149,7 @@ func TestHTTPSClientServer(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	headerValue = response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 

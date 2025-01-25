@@ -22,15 +22,33 @@ type ServerHTTPRequest struct {
 }
 
 func (r *ServerHTTPRequest) SetHeader(key string, value string) {
-	r.headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = []string{strings.TrimSpace(value)}
 }
 
-func (r *ServerHTTPRequest) GetHeader(key string) string {
+func (r *ServerHTTPRequest) AddHeader(key string, value string) {
+	headers, exists := r.headers[strings.ToLower(strings.TrimSpace(key))]
+	if !exists {
+		headers = []string{}
+	}
+	headers = append(headers, value)
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = headers
+}
+
+func (r *ServerHTTPRequest) HasHeaderValue(key string, value string) bool {
+	headers, found := r.headers[strings.ToLower(key)]
+	if found && slices.Contains(headers, value) {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (r *ServerHTTPRequest) GetHeader(key string) []string {
 	value, found := r.headers[strings.ToLower(key)]
 	if found {
 		return value
 	} else {
-		return ""
+		return nil
 	}
 }
 
@@ -114,14 +132,16 @@ func parseHeaders(requestReader *textproto.Reader, request *ServerHTTPRequest) {
 		}
 		headerSplit := strings.Split(line, ":")
 		if len(headerSplit) >= 2 {
-			request.SetHeader(headerSplit[0], strings.Join(headerSplit[1:], ":"))
+			for _, value := range strings.Split(strings.Join(headerSplit[1:], ":"), ",") {
+				request.AddHeader(headerSplit[0], strings.TrimSpace(value))
+			}
 		}
 	}
 }
 
 func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPRequest, error) {
 	var request *ServerHTTPRequest = &ServerHTTPRequest{
-		headers: make(map[string]string),
+		headers: make(map[string][]string),
 	}
 	requestLine, err := requestReader.ReadLine()
 	if err != nil {
@@ -133,7 +153,7 @@ func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPReq
 	}
 
 	parseHeaders(requestReader, request)
-	if request.GetHeader("Host") == "" {
+	if request.GetHeader("Host") == nil {
 		return nil, ErrParsing
 	}
 
@@ -141,17 +161,16 @@ func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPReq
 }
 
 func parseRequestBody(request *ServerHTTPRequest, connection net.Conn, requestReader *textproto.Reader, response *ServerHTTPResponse, onChunk ServerChunkFunction) error {
-	transferEncoding := request.GetHeader("Transfer-Encoding")
-	contentLengthValue := request.GetHeader("Content-Length")
+	contentLengthHeader := request.GetHeader("Content-Length")
 	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 	var err error
-	if request.version == "1.1" && transferEncoding == "chunked" {
+	if request.version == "1.1" && request.HasHeaderValue("Transfer-Encoding", "chunked") {
 		request.Body, err = parseServerChunkedBody(requestReader, connection, request, response, onChunk)
 		if err != nil {
 			return err
 		}
-	} else if contentLengthValue != "" {
-
+	} else if contentLengthHeader != nil {
+		contentLengthValue := contentLengthHeader[len(contentLengthHeader)-1]
 		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil {
 			return err

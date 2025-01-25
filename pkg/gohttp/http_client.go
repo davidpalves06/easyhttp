@@ -47,7 +47,7 @@ func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse
 			if !ok {
 				return nil, errors.New("no host to send request. Use absolute URI or host header")
 			}
-			request.uri.Host = host
+			request.uri.Host = host[0]
 		}
 
 		request.SetHeader("Host", request.uri.Host)
@@ -96,7 +96,7 @@ func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse
 		}
 
 		if isRedirected(response) {
-			var location = response.GetHeader("Location")
+			var location = response.GetHeader("Location")[0]
 			uri, _ := url.ParseRequestURI(location)
 			if uri.Host != "" {
 				err = request.SetURI(location)

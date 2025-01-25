@@ -80,21 +80,30 @@ func (r *ServerHTTPResponse) Read(buffer []byte) (int, error) {
 	return r.body.Read(buffer)
 }
 
-func (r *ServerHTTPResponse) SetHeader(headerName string, headerValue string) {
-	r.headers[strings.ToLower(strings.TrimSpace(headerName))] = strings.TrimSpace(headerValue)
+func (r *ServerHTTPResponse) SetHeader(key string, value string) {
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = []string{strings.TrimSpace(value)}
 }
 
 func (r *ServerHTTPResponse) SetStatus(status int) {
 	r.statusCode = status
 }
 
-func (r *ServerHTTPResponse) GetHeader(key string) string {
+func (r *ServerHTTPResponse) GetHeader(key string) []string {
 	value, found := r.headers[strings.ToLower(key)]
 	if found {
 		return value
 	} else {
-		return ""
+		return nil
 	}
+}
+
+func (r *ServerHTTPResponse) AddHeader(key string, value string) {
+	headers, exists := r.headers[strings.ToLower(strings.TrimSpace(key))]
+	if !exists {
+		headers = []string{}
+	}
+	headers = append(headers, value)
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = headers
 }
 
 func (r *ServerHTTPResponse) ExistsHeader(key string) bool {
@@ -121,14 +130,25 @@ func (r *ServerHTTPResponse) toBytes() ([]byte, error) {
 	}
 
 	for headerName, headerValue := range r.headers {
-		var headerLine = fmt.Sprintf("%s: %s\r\n", headerName, headerValue)
-		buffer.WriteString(headerLine)
+		builder := new(strings.Builder)
+		builder.WriteString(headerName)
+		builder.WriteString(": ")
+		for i, value := range headerValue {
+			builder.WriteString(value)
+			if i < len(headerValue)-1 {
+				builder.WriteString(", ")
+			}
+		}
+		builder.WriteString("\r\n")
+		buffer.WriteString(builder.String())
 	}
 
 	buffer.WriteString("\r\n")
 
-	contentLengthValue := r.GetHeader("Content-Length")
-	if contentLengthValue != "" && !r.chunked {
+	contentLengthHeader := r.GetHeader("Content-Length")
+
+	if contentLengthHeader != nil && !r.chunked {
+		contentLengthValue := contentLengthHeader[len(contentLengthHeader)-1]
 		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil || bodyLength == 0 {
 			return nil, errors.New("content length not valid")
@@ -154,7 +174,7 @@ func (r *ServerHTTPResponse) toBytes() ([]byte, error) {
 
 func newHTTPResponse(request *ServerHTTPRequest, connection net.Conn) *ServerHTTPResponse {
 	response := &ServerHTTPResponse{
-		headers:     make(map[string]string),
+		headers:     make(map[string][]string),
 		statusCode:  STATUS_OK,
 		body:        new(bytes.Buffer),
 		chunkWriter: connection,

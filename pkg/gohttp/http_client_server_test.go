@@ -23,8 +23,7 @@ func TestVersion(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 
@@ -48,8 +47,7 @@ func TestVersion(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	headerValue = response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 
@@ -86,15 +84,41 @@ func TestHeadRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	request.headers["Connection"] = "close"
+	request.AddHeader("Connection", "close")
 	response, err := client.HEAD(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
+	}
+	if response.HasBody() {
+		t.Fatalf("Body is not empty\n")
+	}
+
+}
+
+func TestMultipleHeaderRequests(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+	client := NewHTTPClient()
+
+	request, err := NewRequest("http://localhost:1234/path")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	request.AddHeader("Connection", "close")
+	request.AddHeader("RequestHeader", "Test")
+	request.AddHeader("RequestHeader", "Passed")
+
+	response, err := client.HEAD(request)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("ResponseHeader", "Test") || !response.HasHeaderValue("ResponseHeader", "Passed") || len(response.GetHeader("ResponseHeader")) < 2 {
+		t.Fatalf("Status code or header are wrong")
 	}
 	if response.HasBody() {
 		t.Fatalf("Body is not empty\n")
@@ -121,8 +145,7 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 		t.Fatal("HTTP VERSION IS WRONG")
 	}
 
-	headerValue := response.GetHeader("TestHeader")
-	if response.StatusCode != STATUS_OK || headerValue != "Hello" {
+	if response.StatusCode != STATUS_OK || !response.HasHeaderValue("TestHeader", "Hello") {
 		t.FailNow()
 	}
 

@@ -36,16 +36,34 @@ func (r *ClientHTTPResponse) Read(buffer []byte) (int, error) {
 	return r.body.Read(buffer)
 }
 
-func (r *ClientHTTPResponse) SetHeader(headerName string, headerValue string) {
-	r.headers[strings.ToLower(strings.TrimSpace(headerName))] = strings.TrimSpace(headerValue)
+func (r *ClientHTTPResponse) SetHeader(key string, value string) {
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = []string{strings.TrimSpace(value)}
 }
 
-func (r *ClientHTTPResponse) GetHeader(key string) string {
+func (r *ClientHTTPResponse) AddHeader(key string, value string) {
+	headers, exists := r.headers[strings.ToLower(strings.TrimSpace(key))]
+	if !exists {
+		headers = []string{}
+	}
+	headers = append(headers, value)
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = headers
+}
+
+func (r *ClientHTTPResponse) GetHeader(key string) []string {
 	value, found := r.headers[strings.ToLower(key)]
 	if found {
 		return value
 	} else {
-		return ""
+		return nil
+	}
+}
+
+func (r *ClientHTTPResponse) HasHeaderValue(key string, value string) bool {
+	headers, found := r.headers[strings.ToLower(key)]
+	if found && slices.Contains(headers, value) {
+		return true
+	} else {
+		return false
 	}
 }
 
@@ -105,7 +123,11 @@ func parseResponseHeaders(responseReader *textproto.Reader, response *ClientHTTP
 			break
 		}
 		headerSplit := strings.Split(line, ":")
-		response.SetHeader(headerSplit[0], strings.Join(headerSplit[1:], ":"))
+		if len(headerSplit) >= 2 {
+			for _, value := range strings.Split(strings.Join(headerSplit[1:], ":"), ",") {
+				response.AddHeader(headerSplit[0], strings.TrimSpace(value))
+			}
+		}
 	}
 }
 
@@ -131,16 +153,16 @@ func parseResponsefromConnection(responseReader *textproto.Reader) (*ClientHTTPR
 }
 
 func parseResponseBody(response *ClientHTTPResponse, connection net.Conn, responseReader *textproto.Reader, onResponseChunk ClientChunkFunction) error {
-	transferEncoding := response.GetHeader("Transfer-Encoding")
-	contentLengthValue := response.GetHeader("Content-Length")
+	contentLengthHeader := response.GetHeader("Content-Length")
 	var err error
 	connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
-	if response.version == "1.1" && transferEncoding == "chunked" {
+	if response.version == "1.1" && response.HasHeaderValue("Transfer-Encoding", "chunked") {
 		response.body, err = parseClientChunkedBody(responseReader, connection, response, onResponseChunk)
 		if err != nil {
 			return err
 		}
-	} else if contentLengthValue != "" {
+	} else if contentLengthHeader != nil {
+		contentLengthValue := contentLengthHeader[len(contentLengthHeader)-1]
 		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil {
 			return err

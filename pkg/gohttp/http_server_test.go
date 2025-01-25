@@ -12,6 +12,8 @@ import (
 func handleRequest(request ServerHTTPRequest, response *ServerHTTPResponse) {
 	response.SetStatus(STATUS_OK)
 	response.SetHeader("TestHeader", "Hello")
+	response.SetHeader("ResponseHeader", "Test")
+	response.AddHeader("ResponseHeader", "Passed")
 	response.Write([]byte("Hello World!\n"))
 }
 

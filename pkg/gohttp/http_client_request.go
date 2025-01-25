@@ -23,15 +23,33 @@ type ClientHTTPRequest struct {
 }
 
 func (r *ClientHTTPRequest) SetHeader(key string, value string) {
-	r.headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = []string{strings.TrimSpace(value)}
 }
 
-func (r *ClientHTTPRequest) GetHeader(key string) string {
+func (r *ClientHTTPRequest) AddHeader(key string, value string) {
+	headers, exists := r.headers[strings.ToLower(strings.TrimSpace(key))]
+	if !exists {
+		headers = []string{}
+	}
+	headers = append(headers, value)
+	r.headers[strings.ToLower(strings.TrimSpace(key))] = headers
+}
+
+func (r *ClientHTTPRequest) GetHeader(key string) []string {
 	value, found := r.headers[strings.ToLower(key)]
 	if found {
 		return value
 	} else {
-		return ""
+		return nil
+	}
+}
+
+func (r *ClientHTTPRequest) HasHeaderValue(key string, value string) bool {
+	headers, found := r.headers[strings.ToLower(key)]
+	if found && slices.Contains(headers, value) {
+		return true
+	} else {
+		return false
 	}
 }
 
@@ -107,8 +125,17 @@ func (r ClientHTTPRequest) toBytes() ([]byte, error) {
 	}
 
 	for headerName, headerValue := range r.headers {
-		var headerLine = fmt.Sprintf("%s: %s\r\n", headerName, headerValue)
-		buffer.WriteString(headerLine)
+		builder := new(strings.Builder)
+		builder.WriteString(headerName)
+		builder.WriteString(": ")
+		for i, value := range headerValue {
+			builder.WriteString(value)
+			if i < len(headerValue)-1 {
+				builder.WriteString(", ")
+			}
+		}
+		builder.WriteString("\r\n")
+		buffer.WriteString(builder.String())
 	}
 
 	buffer.WriteString("\r\n")
@@ -148,7 +175,8 @@ func NewRequestWithBody(uri string, body []byte) (ClientHTTPRequest, error) {
 		newRequest.SetHeader("Content-Type", "text/plain")
 	}
 
-	newRequest.headers["User-Agent"] = softwareName
+	newRequest.SetHeader("User-Agent", softwareName)
+
 	return newRequest, nil
 }
 
@@ -166,6 +194,7 @@ func NewRequest(uri string) (ClientHTTPRequest, error) {
 		uri:          requestURI,
 	}
 
-	newRequest.headers["User-Agent"] = softwareName
+	newRequest.SetHeader("User-Agent", softwareName)
+
 	return newRequest, nil
 }
