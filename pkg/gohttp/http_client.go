@@ -13,12 +13,14 @@ type httpClient struct {
 	activeConnections map[string]net.Conn
 	TLSConfig         *tls.Config
 	MaxRedirects      uint8
+	*CookieStorage
 }
 
 func NewHTTPClient() httpClient {
 	return httpClient{
 		activeConnections: make(map[string]net.Conn),
 		MaxRedirects:      10,
+		CookieStorage:     newCookieStorage(),
 	}
 }
 
@@ -70,6 +72,7 @@ func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse
 			}
 		}
 
+		request.cookies = c.Cookies(request.uri)
 		requestBytes, err := request.toBytes()
 		if err != nil {
 			return nil, err
@@ -87,6 +90,7 @@ func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse
 		if err != nil {
 			return nil, err
 		}
+		c.CookieStorage.SetCookies(request.uri, response.Cookies())
 
 		if isClosingRequest(&request) {
 			connection.Close()

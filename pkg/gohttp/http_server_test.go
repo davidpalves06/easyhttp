@@ -14,6 +14,21 @@ func handleRequest(request ServerHTTPRequest, response *ServerHTTPResponse) {
 	response.SetHeader("TestHeader", "Hello")
 	response.SetHeader("ResponseHeader", "Test")
 	response.AddHeader("ResponseHeader", "Passed")
+	var cookies = request.Cookies()
+	if value, ok := cookies["TestID"]; ok && value == "12345" {
+		response.AddHeader("CookieTest", "Pass")
+		var cookie *Cookie = &Cookie{
+			Name:     "TestID",
+			Value:    "12345",
+			Path:     "/",
+			Domain:   "test.com",
+			MaxAge:   3600,
+			Secure:   true,
+			HTTPOnly: true,
+			SameSite: SAME_SITE_LAX,
+		}
+		response.SetCookie(cookie)
+	}
 	response.Write([]byte("Hello World!\n"))
 }
 
@@ -67,6 +82,23 @@ func handleInfiniteRedirect(request ServerHTTPRequest, response *ServerHTTPRespo
 	response.SetHeader("Location", "http://localhost:1234/infinite/redirect")
 }
 
+func handleCookies(request ServerHTTPRequest, response *ServerHTTPResponse) {
+	response.SetStatus(STATUS_OK)
+	if value, ok := request.Cookies()["TestCookie"]; ok && value == "Pass" {
+		response.Write([]byte("Cookie Received!\n"))
+	} else {
+		var cookie *Cookie = &Cookie{
+			Name:     "TestCookie",
+			Value:    "Pass",
+			MaxAge:   3600,
+			HTTPOnly: true,
+			SameSite: SAME_SITE_LAX,
+		}
+		response.SetCookie(cookie)
+		response.Write([]byte("Sent cookie!\n"))
+	}
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
@@ -78,6 +110,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)
 	server.HandleGET("/chunked", handleChunked)
+	server.HandleGET("/cookie", handleCookies)
 	server.HandleGET("/redirect", PermaRedirect("http://localhost:1234/path"))
 	server.HandleGET("/infinite/redirect", handleInfiniteRedirect)
 	server.HandleGET("/testdata/lusiadasTest.txt", FileServer("testdata"))

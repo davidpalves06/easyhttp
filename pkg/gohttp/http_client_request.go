@@ -16,6 +16,7 @@ type ClientHTTPRequest struct {
 	uri             *url.URL
 	version         string
 	headers         Headers
+	cookies         []*Cookie
 	body            []byte
 	chunkChannel    chan []byte
 	chunked         bool
@@ -138,6 +139,21 @@ func (r ClientHTTPRequest) toBytes() ([]byte, error) {
 		buffer.WriteString(builder.String())
 	}
 
+	if len(r.cookies) > 0 {
+		cookieBuilder := new(strings.Builder)
+		cookieBuilder.WriteString("Cookie: ")
+		for i, cookie := range r.cookies {
+			cookieBuilder.WriteString(cookie.Name)
+			cookieBuilder.WriteString("=")
+			cookieBuilder.WriteString(cookie.Value)
+			if i < len(r.cookies)-1 {
+				cookieBuilder.WriteString("; ")
+			}
+		}
+		cookieBuilder.WriteString("\r\n")
+		buffer.WriteString(cookieBuilder.String())
+	}
+
 	buffer.WriteString("\r\n")
 
 	if r.body != nil && !r.chunked {
@@ -168,6 +184,7 @@ func NewRequestWithBody(uri string, body []byte) (ClientHTTPRequest, error) {
 		chunkChannel: make(chan []byte, 1),
 		chunked:      false,
 		uri:          requestURI,
+		cookies:      make([]*Cookie, 0, 5),
 	}
 
 	if len(body) > 0 {
@@ -192,6 +209,7 @@ func NewRequest(uri string) (ClientHTTPRequest, error) {
 		chunkChannel: make(chan []byte, 1),
 		chunked:      false,
 		uri:          requestURI,
+		cookies:      make([]*Cookie, 0, 5),
 	}
 
 	newRequest.SetHeader("User-Agent", softwareName)

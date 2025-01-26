@@ -19,6 +19,7 @@ type ServerHTTPRequest struct {
 	Body         []byte
 	chunkChannel chan []byte
 	chunked      bool
+	cookies      map[string]string
 }
 
 func (r *ServerHTTPRequest) SetHeader(key string, value string) {
@@ -50,6 +51,10 @@ func (r *ServerHTTPRequest) GetHeader(key string) []string {
 	} else {
 		return nil
 	}
+}
+
+func (r *ServerHTTPRequest) Cookies() map[string]string {
+	return r.cookies
 }
 
 func (r *ServerHTTPRequest) ExistsHeader(key string) bool {
@@ -121,7 +126,7 @@ func parseRequestLine(requestLine string, request *ServerHTTPRequest) error {
 
 }
 
-func parseHeaders(requestReader *textproto.Reader, request *ServerHTTPRequest) {
+func parseHeadersAndCookies(requestReader *textproto.Reader, request *ServerHTTPRequest) {
 	for {
 		var line, err = requestReader.ReadLine()
 		if err != nil {
@@ -137,6 +142,16 @@ func parseHeaders(requestReader *textproto.Reader, request *ServerHTTPRequest) {
 			}
 		}
 	}
+	var cookies = make(map[string]string)
+	cookieHeader := request.GetHeader("cookie")
+	for _, cookieLine := range cookieHeader {
+		for _, cookie := range strings.Split(strings.TrimSpace(cookieLine), ";") {
+			cookiesValues := strings.Split(cookie, "=")
+			cookies[cookiesValues[0]] = cookiesValues[1]
+		}
+	}
+	delete(request.headers, "cookie")
+	request.cookies = cookies
 }
 
 func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPRequest, error) {
@@ -152,7 +167,7 @@ func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPReq
 		return nil, err
 	}
 
-	parseHeaders(requestReader, request)
+	parseHeadersAndCookies(requestReader, request)
 	if request.GetHeader("Host") == nil {
 		return nil, ErrParsing
 	}

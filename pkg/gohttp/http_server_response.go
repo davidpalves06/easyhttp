@@ -22,6 +22,7 @@ type ServerHTTPResponse struct {
 	chunkWriter io.Writer
 	chunked     bool
 	method      string
+	cookies     []*Cookie
 }
 
 func (r *ServerHTTPResponse) Write(p []byte) (n int, err error) {
@@ -40,6 +41,10 @@ func (r *ServerHTTPResponse) SendFile(fileName string) error {
 	}
 	r.body.Write(fileBytes)
 	return nil
+}
+
+func (r *ServerHTTPResponse) SetCookie(cookie *Cookie) {
+	r.cookies = append(r.cookies, cookie)
 }
 
 func (r *ServerHTTPResponse) SendChunk() (int, error) {
@@ -143,6 +148,14 @@ func (r *ServerHTTPResponse) toBytes() ([]byte, error) {
 		buffer.WriteString(builder.String())
 	}
 
+	for _, cookie := range r.cookies {
+		cookieBuilder := new(strings.Builder)
+		cookieBuilder.WriteString("Set-Cookie: ")
+		cookieBuilder.WriteString(cookie.String())
+		cookieBuilder.WriteString("\r\n")
+		buffer.WriteString(cookieBuilder.String())
+	}
+
 	buffer.WriteString("\r\n")
 
 	contentLengthHeader := r.GetHeader("Content-Length")
@@ -180,6 +193,7 @@ func newHTTPResponse(request *ServerHTTPRequest, connection net.Conn) *ServerHTT
 		chunkWriter: connection,
 		version:     request.version,
 		method:      request.method,
+		cookies:     make([]*Cookie, 0, 5),
 	}
 	return response
 }

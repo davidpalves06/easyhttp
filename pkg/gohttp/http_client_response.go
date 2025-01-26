@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log"
 	"net"
 	"net/textproto"
 	"slices"
@@ -33,6 +34,9 @@ func (r *ClientHTTPResponse) Version() string {
 }
 
 func (r *ClientHTTPResponse) Read(buffer []byte) (int, error) {
+	if r.body.Len() == 0 {
+		return 0, io.EOF
+	}
 	return r.body.Read(buffer)
 }
 
@@ -74,6 +78,20 @@ func (r *ClientHTTPResponse) ExistsHeader(key string) bool {
 
 func (r *ClientHTTPResponse) Headers() Headers {
 	return r.headers
+}
+
+func (r *ClientHTTPResponse) Cookies() []*Cookie {
+	var cookies = make([]*Cookie, 0, 5)
+	cookieHeader := r.GetHeader("Set-Cookie")
+	for _, cookieLine := range cookieHeader {
+		cookie, err := parseSetCookieLine(cookieLine)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		cookies = append(cookies, cookie)
+	}
+	return cookies
 }
 
 func parseResponse(connection net.Conn, request ClientHTTPRequest) (*ClientHTTPResponse, error) {
