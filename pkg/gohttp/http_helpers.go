@@ -35,8 +35,8 @@ const (
 	MethodTrace   = "TRACE"
 )
 
-var validMethods = []string{"GET", "HEAD", "POST"}
-var validVersions = []string{"1.0", "1.1", "2.0"}
+var validMethods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
+var validVersions = []string{"1.0", "1.1"}
 
 const (
 	STATUS_OK                  = 200

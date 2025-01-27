@@ -140,6 +140,7 @@ func TestHTTPSClientServer(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	request.version = "1.1"
+	request.CloseConnection()
 	response, err = client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -158,21 +159,4 @@ func TestHTTPSClientServer(t *testing.T) {
 		t.FailNow()
 	}
 
-	request, err = NewRequest("https://localhost:1234/resource")
-	request.SetHeader("Connection", "close")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	request.version = "2.0"
-	response, err = client.GET(request)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	if response.version != "2.0" {
-		t.Fatalf("HTTP VERSION IS WRONG")
-	}
-
-	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
-		t.FailNow()
-	}
 }

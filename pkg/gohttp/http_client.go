@@ -39,6 +39,21 @@ func (c *httpClient) POST(request ClientHTTPRequest) (*ClientHTTPResponse, error
 	return c.sendRequest(request)
 }
 
+func (c *httpClient) DELETE(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+	request.method = MethodDelete
+	return c.sendRequest(request)
+}
+
+func (c *httpClient) PUT(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+	request.method = MethodPut
+	return c.sendRequest(request)
+}
+
+func (c *httpClient) PATCH(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
+	request.method = MethodPatch
+	return c.sendRequest(request)
+}
+
 func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse, error) {
 	var response *ClientHTTPResponse
 	var redirects uint8 = 0

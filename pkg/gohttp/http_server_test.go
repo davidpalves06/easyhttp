@@ -106,6 +106,9 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	}
 
 	server.HandleGET("/path", handleRequest)
+	server.HandlePUT("/path", handleRequest)
+	server.HandlePATCH("/path", handleRequest)
+	server.HandleDELETE("/path", handleRequest)
 	server.HandleGET("/", handleRequest)
 	server.HandlePOST("/resource", handleRequest)
 	server.HandlePOST("/large", handleEcho)

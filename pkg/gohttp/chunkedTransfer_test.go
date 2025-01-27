@@ -17,7 +17,7 @@ func TestChunkedTransfer(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	request.SetHeader("Connection", "close")
+	request.CloseConnection()
 	request.Chunked()
 
 	go func() {
@@ -73,7 +73,7 @@ func TestChunkedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	request.SetHeader("Connection", "close")
+	request.CloseConnection()
 	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
@@ -106,7 +106,7 @@ func TestChunkedServerHandlingWithResponseAfterChunks(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	request.SetHeader("Connection", "close")
+	request.CloseConnection()
 	request.Chunked()
 
 	go func() {
@@ -153,7 +153,7 @@ func TestChunkedServerHandlingWithoutResponseAfterChunks(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	request.SetHeader("Connection", "close")
+	request.CloseConnection()
 	request.Chunked()
 
 	go func() {
@@ -206,7 +206,7 @@ func TestChunkedResponseWithHandlingOnEachChunk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	request.SetHeader("Connection", "close")
+	request.CloseConnection()
 	request.onResponseChunk = handleResponseChunk
 	response, err := client.GET(request)
 	if err != nil {

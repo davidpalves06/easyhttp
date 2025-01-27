@@ -27,6 +27,10 @@ func (r *ClientHTTPRequest) SetHeader(key string, value string) {
 	r.headers[strings.ToLower(strings.TrimSpace(key))] = []string{strings.TrimSpace(value)}
 }
 
+func (r *ClientHTTPRequest) CloseConnection() {
+	r.SetHeader("Connection", "close")
+}
+
 func (r *ClientHTTPRequest) AddHeader(key string, value string) {
 	headers, exists := r.headers[strings.ToLower(strings.TrimSpace(key))]
 	if !exists {

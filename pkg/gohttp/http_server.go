@@ -105,6 +105,60 @@ func (s *HTTPServer) HandlePOSTWithOptions(uriPattern string, handlerFunction Re
 	s.addHandlerForMethod(handler, MethodPost)
 }
 
+func (s *HTTPServer) HandlePUT(uriPattern string, handlerFunction ResponseFunction) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options.onChunk = nil
+
+	s.addHandlerForMethod(handler, MethodPut)
+}
+
+func (s *HTTPServer) HandlePUTWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options = options
+
+	s.addHandlerForMethod(handler, MethodPut)
+}
+
+func (s *HTTPServer) HandleDELETE(uriPattern string, handlerFunction ResponseFunction) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options.onChunk = nil
+
+	s.addHandlerForMethod(handler, MethodDelete)
+}
+
+func (s *HTTPServer) HandleDELETEWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options = options
+
+	s.addHandlerForMethod(handler, MethodDelete)
+}
+
+func (s *HTTPServer) HandlePATCH(uriPattern string, handlerFunction ResponseFunction) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options.onChunk = nil
+
+	s.addHandlerForMethod(handler, MethodPatch)
+}
+
+func (s *HTTPServer) HandlePATCHWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
+	var handler *responseHandlers = new(responseHandlers)
+	handler.uriPattern = uriPattern
+	handler.handler = handlerFunction
+	handler.options = options
+
+	s.addHandlerForMethod(handler, MethodPatch)
+}
+
 func HandleConnection(connection net.Conn, server *HTTPServer) {
 	defer connection.Close()
 	defer server.waitGroup.Done()
