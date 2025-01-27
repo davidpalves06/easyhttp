@@ -38,47 +38,104 @@ const (
 var validMethods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
 var validVersions = []string{"1.0", "1.1"}
 
+var ErrInvalidLength = errors.New("invalid content length")
+var ErrVersionNotSupported = errors.New("version not supported")
+var ErrParsing = errors.New("parsing error")
+
 const (
-	STATUS_OK                  = 200
-	STATUS_CREATED             = 201
-	STATUS_ACCEPTED            = 202
-	STATUS_NO_CONTENT          = 204
-	STATUS_MULTIPLE_CHOICES    = 300
-	STATUS_MOVED_PERMANENTLY   = 301
-	STATUS_MOVED_TEMPORARILY   = 302
-	STATUS_NOT_MODIFIED        = 304
-	STATUS_BAD_REQUEST         = 400
-	STATUS_UNAUTHORIZED        = 401
-	STATUS_FORBIDDEN           = 403
-	STATUS_NOT_FOUND           = 404
-	STATUS_INTERNAL_ERROR      = 500
-	STATUS_NOT_IMPLEMENTED     = 501
-	STATUS_BAD_GATEWAY         = 502
-	STATUS_SERVICE_UNAVAILABLE = 503
+	STATUS_CONTINUE                      = 100
+	STATUS_SWITCHING_PROTOCOL            = 101
+	STATUS_OK                            = 200
+	STATUS_CREATED                       = 201
+	STATUS_ACCEPTED                      = 202
+	STATUS_NON_AUTHORATIVE_INFORMATION   = 203
+	STATUS_NO_CONTENT                    = 204
+	STATUS_RESET_CONTENT                 = 205
+	STATUS_PARTIAL_CONTENT               = 206
+	STATUS_MULTIPLE_CHOICES              = 300
+	STATUS_MOVED_PERMANENTLY             = 301
+	STATUS_FOUND                         = 302
+	STATUS_SEE_OTHER                     = 303
+	STATUS_NOT_MODIFIED                  = 304
+	STATUS_USE_PROXY                     = 305
+	STATUS_UNUSED                        = 306
+	STATUS_TEMPORARY_REDIRECT            = 307
+	STATUS_PERMANENT_REDIRECT            = 308
+	STATUS_BAD_REQUEST                   = 400
+	STATUS_UNAUTHORIZED                  = 401
+	STATUS_PAYMENT_REQUIRED              = 402
+	STATUS_FORBIDDEN                     = 403
+	STATUS_NOT_FOUND                     = 404
+	STATUS_METHOD_NOT_ALLOWED            = 405
+	STATUS_NOT_ACCEPTABLE                = 406
+	STATUS_PROXY_AUTHENTICATION_REQUIRED = 407
+	STATUS_REQUEST_TIMEOUT               = 408
+	STATUS_CONFLICT                      = 409
+	STATUS_GONE                          = 410
+	STATUS_LENGTH_REQUIRED               = 411
+	STATUS_PRECONDITION_FAILED           = 412
+	STATUS_CONTENT_TOO_LARGE             = 413
+	STATUS_URI_TOO_LONG                  = 414
+	STATUS_UNSUPPORTED_MEDIA_TYPE        = 415
+	STATUS_RANGE_NOT_SATISFIABLE         = 416
+	STATUS_MISDIRECTED_REQUEST           = 421
+	STATUS_UNPROCESSABLE_CONTENT         = 422
+	STATUS_UPGRADE_REQUIRED              = 426
+	STATUS_INTERNAL_ERROR                = 500
+	STATUS_NOT_IMPLEMENTED               = 501
+	STATUS_BAD_GATEWAY                   = 502
+	STATUS_SERVICE_UNAVAILABLE           = 503
+	STATUS_GATEWAY_TIMEOUT               = 504
+	STATUS_HTTP_VERSION_NOT_SUPPORTED    = 505
 )
 
 var reasons = map[int]string{
-	STATUS_OK:                  "OK",
-	STATUS_CREATED:             "Created",
-	STATUS_ACCEPTED:            "Accepted",
-	STATUS_NO_CONTENT:          "No content",
-	STATUS_MULTIPLE_CHOICES:    "Multiple Choices",
-	STATUS_MOVED_PERMANENTLY:   "Moved Permanently",
-	STATUS_MOVED_TEMPORARILY:   "Moved Temporarily",
-	STATUS_NOT_MODIFIED:        "Not Modified",
-	STATUS_BAD_REQUEST:         "Bad Request",
-	STATUS_UNAUTHORIZED:        "Unauthorized",
-	STATUS_FORBIDDEN:           "Forbidden",
-	STATUS_NOT_FOUND:           "Not Found",
-	STATUS_INTERNAL_ERROR:      "Internal Error",
-	STATUS_NOT_IMPLEMENTED:     "Not Implemented",
-	STATUS_BAD_GATEWAY:         "Bad Gateway",
-	STATUS_SERVICE_UNAVAILABLE: "Service Unavailable",
+	STATUS_CONTINUE:                      "Continue",
+	STATUS_SWITCHING_PROTOCOL:            "Switching Protocol",
+	STATUS_OK:                            "OK",
+	STATUS_CREATED:                       "Created",
+	STATUS_ACCEPTED:                      "Accepted",
+	STATUS_NON_AUTHORATIVE_INFORMATION:   "Non Authorative Information",
+	STATUS_NO_CONTENT:                    "No Content",
+	STATUS_RESET_CONTENT:                 "Reset Content",
+	STATUS_PARTIAL_CONTENT:               "Partial Content",
+	STATUS_MULTIPLE_CHOICES:              "Multiple Choices",
+	STATUS_MOVED_PERMANENTLY:             "Moved Permanently",
+	STATUS_FOUND:                         "Found",
+	STATUS_SEE_OTHER:                     "See Other",
+	STATUS_NOT_MODIFIED:                  "Not Modified",
+	STATUS_USE_PROXY:                     "Use Proxy",
+	STATUS_TEMPORARY_REDIRECT:            "Temporary Redirect",
+	STATUS_PERMANENT_REDIRECT:            "Permanent Redirect",
+	STATUS_BAD_REQUEST:                   "Bad Request",
+	STATUS_UNAUTHORIZED:                  "Unauthorized",
+	STATUS_PAYMENT_REQUIRED:              "Payment Required",
+	STATUS_FORBIDDEN:                     "Forbidden",
+	STATUS_NOT_FOUND:                     "Not Found",
+	STATUS_METHOD_NOT_ALLOWED:            "Method Not Allowed",
+	STATUS_NOT_ACCEPTABLE:                "Not Acceptable",
+	STATUS_PROXY_AUTHENTICATION_REQUIRED: "Proxy Authentication Required",
+	STATUS_REQUEST_TIMEOUT:               "Request Timeout",
+	STATUS_CONFLICT:                      "Conflict",
+	STATUS_GONE:                          "Gone",
+	STATUS_LENGTH_REQUIRED:               "Length Required",
+	STATUS_PRECONDITION_FAILED:           "Precondition Failed",
+	STATUS_CONTENT_TOO_LARGE:             "Content Too Large",
+	STATUS_URI_TOO_LONG:                  "URI Too Long",
+	STATUS_UNSUPPORTED_MEDIA_TYPE:        "Unsupported Media Type",
+	STATUS_RANGE_NOT_SATISFIABLE:         "Range Not Satisfiable",
+	STATUS_MISDIRECTED_REQUEST:           "Misdirected Request",
+	STATUS_UNPROCESSABLE_CONTENT:         "Unprocessable Content",
+	STATUS_UPGRADE_REQUIRED:              "Upgrade Required",
+	STATUS_INTERNAL_ERROR:                "Internal Error",
+	STATUS_NOT_IMPLEMENTED:               "Not Implemented",
+	STATUS_BAD_GATEWAY:                   "Bad Gateway",
+	STATUS_SERVICE_UNAVAILABLE:           "Service Unavailable",
+	STATUS_GATEWAY_TIMEOUT:               "Gateway Timeout",
+	STATUS_HTTP_VERSION_NOT_SUPPORTED:    "HTTP Version Not Supported",
 }
 
 const KEEP_ALIVE_TIMEOUT = 5
-
-var ErrParsing = errors.New("parsing error")
 
 func isEmpty(element string) bool {
 	return element == ""

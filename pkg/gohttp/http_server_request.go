@@ -119,7 +119,7 @@ func parseRequestLine(requestLine string, request *ServerHTTPRequest) error {
 	var version = requestLineSplit[2]
 	versionSplit := strings.Split(version, "/")
 	if len(versionSplit) != 2 || versionSplit[0] != "HTTP" || !slices.Contains(validVersions, versionSplit[1]) {
-		return ErrParsing
+		return ErrVersionNotSupported
 	}
 	request.version = versionSplit[1]
 	return nil
@@ -188,7 +188,7 @@ func parseRequestBody(request *ServerHTTPRequest, connection net.Conn, requestRe
 		contentLengthValue := contentLengthHeader[len(contentLengthHeader)-1]
 		var bodyLength, err = strconv.ParseInt(contentLengthValue, 10, 32)
 		if err != nil {
-			return err
+			return ErrInvalidLength
 		}
 		if bodyLength != 0 {
 			request.Body, err = parseBodyWithFullContent(bodyLength, requestReader)

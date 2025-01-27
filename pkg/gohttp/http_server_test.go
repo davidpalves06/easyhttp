@@ -167,7 +167,7 @@ func TestServerGet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
+	if response.StatusCode != STATUS_METHOD_NOT_ALLOWED {
 		t.FailNow()
 	}
 

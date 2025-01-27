@@ -156,8 +156,8 @@ func TestServerClosedPermanentConnection(t *testing.T) {
 		t.Fatalf("HTTP VERSION IS WRONG")
 	}
 
-	if response.StatusCode != STATUS_NOT_IMPLEMENTED {
-		t.FailNow()
+	if response.StatusCode != STATUS_METHOD_NOT_ALLOWED {
+		t.Fatalf("Method should not be accepted")
 	}
 
 }

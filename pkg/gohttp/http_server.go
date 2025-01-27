@@ -176,11 +176,15 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 
 		handler, err := getRequestHandler(server, request)
 		if err != nil {
-			response.statusCode = STATUS_NOT_IMPLEMENTED
+			response.statusCode = STATUS_METHOD_NOT_ALLOWED
 		} else {
 			err := parseRequestBody(request, connection, requestReader, response, handler.options.onChunk)
 			if err != nil {
-				sendBadRequestIfNotTimeout(err, connection)
+				if err == ErrInvalidLength {
+					//TODO: SEND INVALID LENGTH
+				} else {
+					sendBadRequestIfNotTimeout(err, connection)
+				}
 				return
 			}
 
