@@ -168,23 +168,24 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		connection.SetReadDeadline(time.Now().Add(KEEP_ALIVE_TIMEOUT * time.Second))
 		request, err := parseRequestFromConnection(requestReader)
 		if err != nil {
-			sendBadRequestIfNotTimeout(err, connection)
+			sendErrorResponse(err, connection)
 			return
 		}
-
 		response := newHTTPResponse(request, connection)
 
 		handler, err := getRequestHandler(server, request)
 		if err != nil {
 			response.statusCode = STATUS_METHOD_NOT_ALLOWED
 		} else {
+			defer func() {
+				if r := recover(); r != nil {
+					sendErrorResponse(ErrInternalError, connection)
+					return
+				}
+			}()
 			err := parseRequestBody(request, connection, requestReader, response, handler.options.onChunk)
 			if err != nil {
-				if err == ErrInvalidLength {
-					//TODO: SEND INVALID LENGTH
-				} else {
-					sendBadRequestIfNotTimeout(err, connection)
-				}
+				sendErrorResponse(err, connection)
 				return
 			}
 
@@ -200,7 +201,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		if !response.chunked {
 			responseBytes, err := response.toBytes()
 			if err != nil {
-				sendBadRequestIfNotTimeout(err, connection)
+				sendErrorResponse(err, connection)
 				return
 			}
 			connection.Write(responseBytes)
@@ -211,10 +212,21 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	}
 }
 
-func sendBadRequestIfNotTimeout(err error, connection net.Conn) {
+func sendErrorResponse(err error, connection net.Conn) {
 	if netErr, ok := err.(net.Error); !ok || !netErr.Timeout() {
-		badRequestResponse := newBadRequestResponse()
-		responseBytes, _ := badRequestResponse.toBytes()
+		var errorResponse ServerHTTPResponse
+		if err == ErrInvalidLength {
+			errorResponse = newInvalidLengthResponse()
+		} else if err == ErrInvalidMethod {
+			errorResponse = newInvalidMethodResponse()
+		} else if err == ErrVersionNotSupported {
+			errorResponse = newUnsupportedVersionResponse()
+		} else if err == ErrBadRequest {
+			errorResponse = newBadRequestResponse()
+		} else if err == ErrInternalError {
+			errorResponse = newInternalErrorResponse()
+		}
+		responseBytes, _ := errorResponse.toBytes()
 		connection.Write(responseBytes)
 	}
 }

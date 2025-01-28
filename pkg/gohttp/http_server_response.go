@@ -207,6 +207,42 @@ func newBadRequestResponse() ServerHTTPResponse {
 	return badRequestResponse
 }
 
+func newInternalErrorResponse() ServerHTTPResponse {
+	badRequestResponse := ServerHTTPResponse{
+		version:    "1.0",
+		statusCode: 500,
+		headers:    make(Headers),
+	}
+	return badRequestResponse
+}
+
+func newInvalidLengthResponse() ServerHTTPResponse {
+	badRequestResponse := ServerHTTPResponse{
+		version:    "1.0",
+		statusCode: STATUS_LENGTH_REQUIRED,
+		headers:    make(Headers),
+	}
+	return badRequestResponse
+}
+
+func newInvalidMethodResponse() ServerHTTPResponse {
+	badRequestResponse := ServerHTTPResponse{
+		version:    "1.0",
+		statusCode: STATUS_METHOD_NOT_ALLOWED,
+		headers:    make(Headers),
+	}
+	return badRequestResponse
+}
+
+func newUnsupportedVersionResponse() ServerHTTPResponse {
+	badRequestResponse := ServerHTTPResponse{
+		version:    "1.0",
+		statusCode: STATUS_HTTP_VERSION_NOT_SUPPORTED,
+		headers:    make(Headers),
+	}
+	return badRequestResponse
+}
+
 func addEssentialHTTPHeaders(response *ServerHTTPResponse) {
 
 	response.SetHeader("Date", time.Now().UTC().Format(time.RFC1123))

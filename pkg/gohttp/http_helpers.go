@@ -39,8 +39,10 @@ var validMethods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"}
 var validVersions = []string{"1.0", "1.1"}
 
 var ErrInvalidLength = errors.New("invalid content length")
+var ErrInvalidMethod = errors.New("invalid method")
 var ErrVersionNotSupported = errors.New("version not supported")
-var ErrParsing = errors.New("parsing error")
+var ErrBadRequest = errors.New("bad request")
+var ErrInternalError = errors.New("internal error")
 
 const (
 	STATUS_CONTINUE                      = 100

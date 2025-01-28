@@ -101,18 +101,18 @@ func (r *ServerHTTPRequest) Chunked() {
 func parseRequestLine(requestLine string, request *ServerHTTPRequest) error {
 	var requestLineSplit = strings.Split(requestLine, " ")
 	if len(requestLineSplit) != 3 {
-		return ErrParsing
+		return ErrBadRequest
 	}
 	var method string = requestLineSplit[0]
 	if !slices.Contains(validMethods, method) {
-		return ErrParsing
+		return ErrInvalidMethod
 	}
 	request.method = method
 
 	var requestUri = requestLineSplit[1]
 	parsedUri, err := url.ParseRequestURI(requestUri)
 	if err != nil {
-		return ErrParsing
+		return ErrBadRequest
 	}
 	request.uri = parsedUri
 
@@ -169,7 +169,7 @@ func parseRequestFromConnection(requestReader *textproto.Reader) (*ServerHTTPReq
 
 	parseHeadersAndCookies(requestReader, request)
 	if request.GetHeader("Host") == nil {
-		return nil, ErrParsing
+		return nil, ErrBadRequest
 	}
 
 	return request, nil

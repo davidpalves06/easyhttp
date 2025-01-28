@@ -99,6 +99,10 @@ func handleCookies(request ServerHTTPRequest, response *ServerHTTPResponse) {
 	}
 }
 
+func handlePanic(request ServerHTTPRequest, response *ServerHTTPResponse) {
+	panic("OMG")
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
@@ -106,6 +110,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	}
 
 	server.HandleGET("/path", handleRequest)
+	server.HandleGET("/panic", handlePanic)
 	server.HandlePUT("/path", handleRequest)
 	server.HandlePATCH("/path", handleRequest)
 	server.HandleDELETE("/path", handleRequest)
