@@ -2,10 +2,12 @@ package gohttp
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"errors"
 	"net"
 	"net/textproto"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,11 @@ type HTTPServer struct {
 	uriHandlers map[string][]*responseHandlers
 	running     bool
 	waitGroup   sync.WaitGroup
+	timeout     int
+}
+
+func (s *HTTPServer) SetTimeout(timeout_ms int) {
+	s.timeout = timeout_ms
 }
 
 type ResponseFunction func(ServerHTTPRequest, *ServerHTTPResponse)
@@ -177,23 +184,18 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		if err != nil {
 			response.statusCode = STATUS_METHOD_NOT_ALLOWED
 		} else {
-			defer func() {
-				if r := recover(); r != nil {
-					sendErrorResponse(ErrInternalError, connection)
-					return
-				}
-			}()
 			err := parseRequestBody(request, connection, requestReader, response, handler.options.onChunk)
 			if err != nil {
 				sendErrorResponse(err, connection)
 				return
 			}
 
-			if handler.options.onChunk == nil || handler.options.runAfterChunks {
-				handler.handler(*request, response)
+			err = executeRequest(server, handler, request, response, connection)
+			if err != nil {
+				sendErrorResponse(err, connection)
+				return
 			}
 		}
-
 		if request.method == MethodHead {
 			response.body = nil
 		}
@@ -201,7 +203,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		if !response.chunked {
 			responseBytes, err := response.toBytes()
 			if err != nil {
-				sendErrorResponse(err, connection)
+				sendErrorResponse(ErrInternalError, connection)
 				return
 			}
 			connection.Write(responseBytes)
@@ -210,6 +212,43 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 		}
 		keepAlive = !isClosingRequest(request)
 	}
+}
+
+func executeRequest(server *HTTPServer, handler *responseHandlers, request *ServerHTTPRequest, response *ServerHTTPResponse, connection net.Conn) error {
+	var executionContext context.Context
+	var executionChannel chan error = make(chan error, 1)
+	if server.timeout > 0 {
+		var cancel context.CancelFunc
+		executionContext, cancel = context.WithTimeout(context.Background(), time.Duration(server.timeout)*time.Millisecond)
+		defer cancel()
+	} else {
+		executionContext = context.Background()
+	}
+
+	if handler.options.onChunk == nil || handler.options.runAfterChunks {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					executionChannel <- ErrInternalError
+					runtime.Goexit()
+				}
+			}()
+			handler.handler(*request, response)
+			executionChannel <- nil
+		}()
+		select {
+		case <-executionContext.Done():
+			sendErrorResponse(ErrRequestTimeout, connection)
+			return ErrRequestTimeout
+		case executionError := <-executionChannel:
+			if executionError != nil {
+				sendErrorResponse(executionError, connection)
+				return executionError
+			}
+		}
+	}
+	close(executionChannel)
+	return nil
 }
 
 func sendErrorResponse(err error, connection net.Conn) {
@@ -223,7 +262,9 @@ func sendErrorResponse(err error, connection net.Conn) {
 			errorResponse = newUnsupportedVersionResponse()
 		} else if err == ErrBadRequest {
 			errorResponse = newBadRequestResponse()
-		} else if err == ErrInternalError {
+		} else if err == ErrRequestTimeout {
+			errorResponse = newRequestTimeoutErrorResponse()
+		} else {
 			errorResponse = newInternalErrorResponse()
 		}
 		responseBytes, _ := errorResponse.toBytes()

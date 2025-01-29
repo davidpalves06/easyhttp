@@ -42,6 +42,7 @@ var ErrInvalidLength = errors.New("invalid content length")
 var ErrInvalidMethod = errors.New("invalid method")
 var ErrVersionNotSupported = errors.New("version not supported")
 var ErrBadRequest = errors.New("bad request")
+var ErrRequestTimeout = errors.New("request timeout")
 var ErrInternalError = errors.New("internal error")
 
 const (

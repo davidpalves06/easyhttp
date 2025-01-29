@@ -216,6 +216,15 @@ func newInternalErrorResponse() ServerHTTPResponse {
 	return badRequestResponse
 }
 
+func newRequestTimeoutErrorResponse() ServerHTTPResponse {
+	badRequestResponse := ServerHTTPResponse{
+		version:    "1.0",
+		statusCode: STATUS_REQUEST_TIMEOUT,
+		headers:    make(Headers),
+	}
+	return badRequestResponse
+}
+
 func newInvalidLengthResponse() ServerHTTPResponse {
 	badRequestResponse := ServerHTTPResponse{
 		version:    "1.0",

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 )
 
 func handleRequest(request ServerHTTPRequest, response *ServerHTTPResponse) {
@@ -103,12 +104,18 @@ func handlePanic(request ServerHTTPRequest, response *ServerHTTPResponse) {
 	panic("OMG")
 }
 
+func handleTimeout(request ServerHTTPRequest, response *ServerHTTPResponse) {
+	time.Sleep(time.Duration(6000) * time.Millisecond)
+	response.SetStatus(STATUS_OK)
+	response.SetHeader("TestHeader", "Hello")
+}
+
 func setupServer(tb testing.TB) func(tb testing.TB) {
 	server, err := NewHTTPServer(":1234")
 	if err != nil {
 		tb.Fatalf("Error creating HTTP Server")
 	}
-
+	server.SetTimeout(5000)
 	server.HandleGET("/path", handleRequest)
 	server.HandleGET("/panic", handlePanic)
 	server.HandlePUT("/path", handleRequest)
@@ -119,6 +126,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandlePOST("/large", handleEcho)
 	server.HandleGET("/chunked", handleChunked)
 	server.HandleGET("/cookie", handleCookies)
+	server.HandleGET("/timeout", handleTimeout)
 	server.HandleGET("/redirect", PermaRedirect("http://localhost:1234/path"))
 	server.HandleGET("/infinite/redirect", handleInfiniteRedirect)
 	server.HandleGET("/testdata/lusiadasTest.txt", FileServer("testdata"))

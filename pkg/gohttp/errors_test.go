@@ -1,6 +1,7 @@
 package gohttp
 
 import (
+	"log"
 	"testing"
 )
 
@@ -86,12 +87,35 @@ func TestPanicOnHandler(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
+	request.CloseConnection()
 	response, err := client.GET(request)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
 	if response.StatusCode != STATUS_INTERNAL_ERROR {
+		log.Println(response.StatusCode)
+		t.FailNow()
+	}
+
+}
+
+func TestTimeoutOnHandler(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+	client := NewHTTPClient()
+
+	request, err := NewRequest("http://localhost:1234/timeout")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	request.CloseConnection()
+	response, err := client.GET(request)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if response.StatusCode != STATUS_REQUEST_TIMEOUT {
 		t.FailNow()
 	}
 
