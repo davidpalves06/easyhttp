@@ -3,6 +3,7 @@ package gohttp
 import (
 	"log"
 	"testing"
+	"time"
 )
 
 func TestInvalidLength(t *testing.T) {
@@ -117,6 +118,24 @@ func TestTimeoutOnHandler(t *testing.T) {
 
 	if response.StatusCode != STATUS_REQUEST_TIMEOUT {
 		t.FailNow()
+	}
+
+}
+
+func TestTimeoutOnClient(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+	client := NewHTTPClient()
+
+	request, err := NewRequest("http://localhost:1234/timeout")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	request.CloseConnection()
+	request.SetTimeout(time.Duration(2000) * time.Millisecond)
+	_, err = client.GET(request)
+	if err != ErrClientTimeout {
+		t.Fatalf("Got wrong error %s\n", err.Error())
 	}
 
 }

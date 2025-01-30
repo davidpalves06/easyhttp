@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type ClientHTTPRequest struct {
@@ -21,6 +22,7 @@ type ClientHTTPRequest struct {
 	chunkChannel    chan []byte
 	chunked         bool
 	onResponseChunk ClientChunkFunction
+	timeout         time.Duration
 }
 
 func (r *ClientHTTPRequest) SetHeader(key string, value string) {
@@ -29,6 +31,10 @@ func (r *ClientHTTPRequest) SetHeader(key string, value string) {
 
 func (r *ClientHTTPRequest) CloseConnection() {
 	r.SetHeader("Connection", "close")
+}
+
+func (r *ClientHTTPRequest) SetTimeout(timeout_ms time.Duration) {
+	r.timeout = timeout_ms
 }
 
 func (r *ClientHTTPRequest) AddHeader(key string, value string) {

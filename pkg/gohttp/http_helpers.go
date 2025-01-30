@@ -43,6 +43,7 @@ var ErrInvalidMethod = errors.New("invalid method")
 var ErrVersionNotSupported = errors.New("version not supported")
 var ErrBadRequest = errors.New("bad request")
 var ErrRequestTimeout = errors.New("request timeout")
+var ErrClientTimeout = errors.New("client timeout")
 var ErrInternalError = errors.New("internal error")
 
 const (

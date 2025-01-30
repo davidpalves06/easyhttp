@@ -115,7 +115,7 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	if err != nil {
 		tb.Fatalf("Error creating HTTP Server")
 	}
-	server.SetTimeout(5000)
+	server.SetTimeout(time.Duration(5) * time.Second)
 	server.HandleGET("/path", handleRequest)
 	server.HandleGET("/panic", handlePanic)
 	server.HandlePUT("/path", handleRequest)

@@ -101,8 +101,18 @@ func (c *httpClient) sendRequest(request ClientHTTPRequest) (*ClientHTTPResponse
 			request.sendChunks(connection)
 		}
 
+		if request.timeout > 0 {
+			connection.SetReadDeadline(time.Now().Add(request.timeout))
+		} else {
+			connection.SetReadDeadline(time.Time{})
+		}
 		response, err = parseResponse(connection, request)
 		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				connection.Close()
+				delete(c.activeConnections, request.uri.Host)
+				return nil, ErrClientTimeout
+			}
 			return nil, err
 		}
 		c.CookieStorage.SetCookies(request.uri, response.Cookies())

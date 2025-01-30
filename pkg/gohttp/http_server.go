@@ -19,10 +19,10 @@ type HTTPServer struct {
 	uriHandlers map[string][]*responseHandlers
 	running     bool
 	waitGroup   sync.WaitGroup
-	timeout     int
+	timeout     time.Duration
 }
 
-func (s *HTTPServer) SetTimeout(timeout_ms int) {
+func (s *HTTPServer) SetTimeout(timeout_ms time.Duration) {
 	s.timeout = timeout_ms
 }
 
@@ -219,7 +219,7 @@ func executeRequest(server *HTTPServer, handler *responseHandlers, request *Serv
 	var executionChannel chan error = make(chan error, 1)
 	if server.timeout > 0 {
 		var cancel context.CancelFunc
-		executionContext, cancel = context.WithTimeout(context.Background(), time.Duration(server.timeout)*time.Millisecond)
+		executionContext, cancel = context.WithTimeout(context.Background(), server.timeout)
 		defer cancel()
 	} else {
 		executionContext = context.Background()
@@ -305,7 +305,8 @@ func (s *HTTPServer) Run() {
 func (s *HTTPServer) Close() error {
 	s.running = false
 	err := s.listener.Close()
-	s.waitGroup.Wait()
+	//TODO:BETTER SHUTDOWN LOGIC
+	// s.waitGroup.Wait()
 	return err
 }
 
