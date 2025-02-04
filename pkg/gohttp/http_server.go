@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	"errors"
 	"net"
 	"net/textproto"
 	"runtime"
@@ -16,7 +15,7 @@ import (
 type HTTPServer struct {
 	address     string
 	listener    net.Listener
-	uriHandlers map[string][]*responseHandlers
+	uriHandlers map[string]map[string]*responseHandler
 	running     bool
 	waitGroup   sync.WaitGroup
 	timeout     time.Duration
@@ -35,7 +34,7 @@ type HandlerOptions struct {
 	runAfterChunks bool
 }
 
-type responseHandlers struct {
+type responseHandler struct {
 	uriPattern string
 	handler    ResponseFunction
 	options    HandlerOptions
@@ -64,38 +63,37 @@ func PermaRedirect(redirectURI string) ResponseFunction {
 	}
 }
 
-func (s *HTTPServer) addHandlerForMethod(handler *responseHandlers, method string) {
+func (s *HTTPServer) addHandlerForMethod(handler *responseHandler, method string) {
 
-	if currentHandlers, exists := s.uriHandlers[method]; exists {
-		s.uriHandlers[method] = append(currentHandlers, handler)
+	if currentHandlers, exists := s.uriHandlers[handler.uriPattern]; exists {
+		currentHandlers[method] = handler
 	} else {
-		currentHandlers = make([]*responseHandlers, 0)
-		s.uriHandlers[method] = append(currentHandlers, handler)
+		currentHandlers = make(map[string]*responseHandler)
+		currentHandlers[method] = handler
+		s.uriHandlers[handler.uriPattern] = currentHandlers
 	}
 }
 
 func (s *HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFunction) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options.onChunk = nil
 
 	s.addHandlerForMethod(handler, MethodGet)
-	s.addHandlerForMethod(handler, MethodHead)
 }
 
 func (s *HTTPServer) HandleGETWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options = options
 
 	s.addHandlerForMethod(handler, MethodGet)
-	s.addHandlerForMethod(handler, MethodHead)
 }
 
 func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunction) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options.onChunk = nil
@@ -104,7 +102,7 @@ func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunct
 }
 
 func (s *HTTPServer) HandlePOSTWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options = options
@@ -113,7 +111,7 @@ func (s *HTTPServer) HandlePOSTWithOptions(uriPattern string, handlerFunction Re
 }
 
 func (s *HTTPServer) HandlePUT(uriPattern string, handlerFunction ResponseFunction) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options.onChunk = nil
@@ -122,7 +120,7 @@ func (s *HTTPServer) HandlePUT(uriPattern string, handlerFunction ResponseFuncti
 }
 
 func (s *HTTPServer) HandlePUTWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options = options
@@ -131,7 +129,7 @@ func (s *HTTPServer) HandlePUTWithOptions(uriPattern string, handlerFunction Res
 }
 
 func (s *HTTPServer) HandleDELETE(uriPattern string, handlerFunction ResponseFunction) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options.onChunk = nil
@@ -140,7 +138,7 @@ func (s *HTTPServer) HandleDELETE(uriPattern string, handlerFunction ResponseFun
 }
 
 func (s *HTTPServer) HandleDELETEWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options = options
@@ -149,7 +147,7 @@ func (s *HTTPServer) HandleDELETEWithOptions(uriPattern string, handlerFunction 
 }
 
 func (s *HTTPServer) HandlePATCH(uriPattern string, handlerFunction ResponseFunction) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options.onChunk = nil
@@ -158,7 +156,7 @@ func (s *HTTPServer) HandlePATCH(uriPattern string, handlerFunction ResponseFunc
 }
 
 func (s *HTTPServer) HandlePATCHWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
-	var handler *responseHandlers = new(responseHandlers)
+	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
 	handler.handler = handlerFunction
 	handler.options = options
@@ -182,7 +180,16 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 
 		handler, err := getRequestHandler(server, request)
 		if err != nil {
-			response.statusCode = STATUS_METHOD_NOT_ALLOWED
+			if err == ErrNotFound {
+				response.statusCode = STATUS_NOT_FOUND
+			}
+			if err == ErrMethodNotAllowed {
+				response.statusCode = STATUS_METHOD_NOT_ALLOWED
+				methods := getAllowedMethods(server, request)
+				for _, method := range methods {
+					response.AddHeader("Allow", method)
+				}
+			}
 		} else {
 			err := parseRequestBody(request, connection, requestReader, response, handler.options.onChunk)
 			if err != nil {
@@ -214,7 +221,7 @@ func HandleConnection(connection net.Conn, server *HTTPServer) {
 	}
 }
 
-func executeRequest(server *HTTPServer, handler *responseHandlers, request *ServerHTTPRequest, response *ServerHTTPResponse, connection net.Conn) error {
+func executeRequest(server *HTTPServer, handler *responseHandler, request *ServerHTTPRequest, response *ServerHTTPResponse, connection net.Conn) error {
 	var executionContext context.Context
 	var executionChannel chan error = make(chan error, 1)
 	if server.timeout > 0 {
@@ -256,7 +263,7 @@ func sendErrorResponse(err error, connection net.Conn) {
 		var errorResponse ServerHTTPResponse
 		if err == ErrInvalidLength {
 			errorResponse = newInvalidLengthResponse()
-		} else if err == ErrInvalidMethod {
+		} else if err == ErrInvalidMethod || err == ErrMethodNotAllowed {
 			errorResponse = newInvalidMethodResponse()
 		} else if err == ErrVersionNotSupported {
 			errorResponse = newUnsupportedVersionResponse()
@@ -272,18 +279,39 @@ func sendErrorResponse(err error, connection net.Conn) {
 	}
 }
 
-func getRequestHandler(server *HTTPServer, request *ServerHTTPRequest) (*responseHandlers, error) {
-	if handlers, exists := server.uriHandlers[request.method]; exists {
-		for _, handler := range handlers {
-			var uriPattern = handler.uriPattern
-			if isURIMatch(request.uri.Path, uriPattern) {
+func getRequestHandler(server *HTTPServer, request *ServerHTTPRequest) (*responseHandler, error) {
+	var method = request.method
+	if method == MethodHead {
+		method = MethodGet
+	}
+	var matched = false
+	for uri, methodMap := range server.uriHandlers {
+		if isURIMatch(request.uri.Path, uri) {
+			matched = true
+			if handler, ok := methodMap[method]; ok {
 				return handler, nil
 			}
 		}
-		return nil, errors.New("handler not implemented")
-	} else {
-		return nil, errors.New("handler not implemented")
 	}
+	if matched {
+		return nil, ErrMethodNotAllowed
+	} else {
+		return nil, ErrNotFound
+	}
+}
+
+func getAllowedMethods(server *HTTPServer, request *ServerHTTPRequest) []string {
+
+	var methods = make([]string, 0, 5)
+	for uri, methodMap := range server.uriHandlers {
+		if isURIMatch(request.uri.Path, uri) {
+			for method := range methodMap {
+				methods = append(methods, method)
+			}
+			return methods
+		}
+	}
+	return methods
 }
 
 func (s *HTTPServer) AcceptConnection() (net.Conn, error) {
@@ -302,11 +330,16 @@ func (s *HTTPServer) Run() {
 	}
 }
 
+func (s *HTTPServer) GracefullShutdown() error {
+	s.running = false
+	err := s.listener.Close()
+	s.waitGroup.Wait()
+	return err
+}
+
 func (s *HTTPServer) Close() error {
 	s.running = false
 	err := s.listener.Close()
-	//TODO:BETTER SHUTDOWN LOGIC
-	// s.waitGroup.Wait()
 	return err
 }
 
@@ -318,7 +351,7 @@ func NewHTTPServer(address string) (*HTTPServer, error) {
 	return &HTTPServer{
 		address:     address,
 		listener:    listener,
-		uriHandlers: make(map[string][]*responseHandlers),
+		uriHandlers: make(map[string]map[string]*responseHandler),
 	}, nil
 }
 
@@ -330,6 +363,6 @@ func NewTLSHTTPServer(address string, config *tls.Config) (*HTTPServer, error) {
 	return &HTTPServer{
 		address:     address,
 		listener:    listener,
-		uriHandlers: make(map[string][]*responseHandlers),
+		uriHandlers: make(map[string]map[string]*responseHandler),
 	}, nil
 }

@@ -139,3 +139,45 @@ func TestTimeoutOnClient(t *testing.T) {
 	}
 
 }
+
+func TestNotFound(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+	client := NewHTTPClient()
+
+	request, err := NewRequest("http://localhost:1234/notfound")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	response, err := client.GET(request)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if response.StatusCode != STATUS_NOT_FOUND {
+		t.Fatalf("Got wrong STATUS %d\n", response.StatusCode)
+	}
+
+}
+
+func TestMethodNotAllowed(t *testing.T) {
+	tearDown := setupServer(t)
+	defer tearDown(t)
+	client := NewHTTPClient()
+
+	request, err := NewRequest("http://localhost:1234/")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	response, err := client.PUT(request)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if response.StatusCode != STATUS_METHOD_NOT_ALLOWED {
+		t.Fatalf("Got wrong STATUS %d\n", response.StatusCode)
+	}
+
+	if !response.HasHeaderValue("Allow", "GET") {
+		t.Fatalf("Missing allow header")
+	}
+
+}
