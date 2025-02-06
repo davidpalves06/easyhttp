@@ -1,7 +1,4 @@
-# WebSocket
-Go HTTP implementation as defined in protocol RFC 9110.
+# HTTPGolang
+Go HTTP implementation as defined in protocol RFC 9112.
 
-//TODO: REDIRECT
-//TODO: COOKIES
-//TODO: MULTI-HEADERS
-//TODO: HTTP2.0
+For now, i only supports HTTP 1.1
