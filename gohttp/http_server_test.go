@@ -129,7 +129,8 @@ func setupServer(tb testing.TB) func(tb testing.TB) {
 	server.HandleGET("/timeout", handleTimeout)
 	server.HandleGET("/redirect", PermaRedirect("http://localhost:1234/path"))
 	server.HandleGET("/infinite/redirect", handleInfiniteRedirect)
-	server.HandleGET("/testdata/lusiadasTest.txt", FileServer("testdata"))
+	server.HandleGET("/testdata/lusiadasTest.txt", FileServerFromPath("testdata"))
+	server.HandleGET("/testdata", FileServer("testdata/lusiadasTest.txt"))
 	server.HandlePOSTWithOptions("/runafter", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: true})
 	server.HandlePOSTWithOptions("/notrun", handleRequest, HandlerOptions{onChunk: handleChunk, runAfterChunks: false})
 	go func() {

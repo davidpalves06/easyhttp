@@ -40,7 +40,14 @@ type responseHandler struct {
 	options    HandlerOptions
 }
 
-func FileServer(filePrefix string) ResponseFunction {
+func FileServer(fileName string) ResponseFunction {
+	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
+		response.statusCode = STATUS_OK
+		response.SendFile(fileName)
+	}
+}
+
+func FileServerFromPath(filePrefix string) ResponseFunction {
 	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
 		response.statusCode = STATUS_OK
 		var requestPath string = request.Path()
@@ -164,7 +171,7 @@ func (s *HTTPServer) HandlePATCHWithOptions(uriPattern string, handlerFunction R
 	s.addHandlerForMethod(handler, MethodPatch)
 }
 
-func HandleConnection(connection net.Conn, server *HTTPServer) {
+func handleConnection(connection net.Conn, server *HTTPServer) {
 	defer connection.Close()
 	defer server.waitGroup.Done()
 	var keepAlive = true
@@ -314,19 +321,19 @@ func getAllowedMethods(server *HTTPServer, request *ServerHTTPRequest) []string 
 	return methods
 }
 
-func (s *HTTPServer) AcceptConnection() (net.Conn, error) {
+func (s *HTTPServer) acceptConnection() (net.Conn, error) {
 	return s.listener.Accept()
 }
 
 func (s *HTTPServer) Run() {
 	s.running = true
 	for s.running {
-		connection, err := s.AcceptConnection()
+		connection, err := s.acceptConnection()
 		if err != nil {
 			break
 		}
 		s.waitGroup.Add(1)
-		go HandleConnection(connection, s)
+		go handleConnection(connection, s)
 	}
 }
 
