@@ -38,7 +38,7 @@ var mime_types = map[string]string{
 	"gif":  "image/gif",
 	"mp4":  "video/mp4",
 	"zip":  "application/zip",
-	"svg":  "image/svg",
+	"svg":  "image/svg+xml",
 }
 
 // HTTP Headers
