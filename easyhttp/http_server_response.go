@@ -1,4 +1,4 @@
-package gohttp
+package easyhttp
 
 import (
 	"bytes"
@@ -41,19 +41,13 @@ func (r *ServerHTTPResponse) SendFile(fileName string) error {
 		return err
 	}
 	r.body.Write(fileBytes)
-	extension := filepath.Ext(fileName)
-	if extension == ".js" || extension == ".mjs" {
-		r.SetHeader("Content-Type", "application/javascript")
-	} else if extension == ".pdf" {
-		r.SetHeader("Content-Type", "application/pdf")
-	} else if extension == ".json" {
-		r.SetHeader("Content-Type", "application/json")
-	} else if extension == ".xml" {
-		r.SetHeader("Content-Type", "application/xml")
-	} else if extension == ".css" {
-		r.SetHeader("Content-Type", "text/css")
-	} else if extension == ".html" {
-		r.SetHeader("Content-Type", "text/html")
+	extension := filepath.Ext(fileName)[1:]
+
+	content_type, ok := mime_types[extension]
+	if !ok {
+		r.SetHeader("Content-Type", "application/octet-stream")
+	} else {
+		r.SetHeader("Content-Type", content_type)
 	}
 	return nil
 }

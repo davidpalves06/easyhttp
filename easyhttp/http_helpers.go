@@ -1,4 +1,9 @@
-package gohttp
+//Package easyhttp implements the HTTP Protocol to create a server to receive requests or client to send requests.
+//
+// The easyhttp package should be used only on HTTP 1.1 for now. It makes HTTP easy by providing simple methods
+// so even if the user does not know the full HTTP protocol, he can still implement HTTP communication easily.
+
+package easyhttp
 
 import (
 	"bytes"
@@ -12,6 +17,7 @@ import (
 	"time"
 )
 
+// Interface that HTTP Requests should follow
 type httpRequest interface {
 	SetHeader(key string, value string)
 	GetHeader(key string) []string
@@ -20,9 +26,28 @@ type httpRequest interface {
 	HasHeaderValue(key string, value string) bool
 }
 
+var mime_types = map[string]string{
+	"txt":  "text/plain",
+	"html": "text/html",
+	"css":  "text/css",
+	"js":   "application/javascript",
+	"json": "application/json",
+	"pdf":  "application/pdf",
+	"jpg":  "image/jpeg",
+	"png":  "image/png",
+	"gif":  "image/gif",
+	"mp4":  "video/mp4",
+	"zip":  "application/zip",
+	"svg":  "image/svg",
+}
+
+// HTTP Headers
 type Headers map[string][]string
 
-const softwareName = "GoHTTP 1.0"
+// Software Agent Name
+const softwareName = "Easyhttp 1.0"
+
+// HTTP Methods
 const (
 	MethodGet     = "GET"
 	MethodHead    = "HEAD"
@@ -48,6 +73,7 @@ var ErrRequestTimeout = errors.New("request timeout")
 var ErrClientTimeout = errors.New("client timeout")
 var ErrInternalError = errors.New("internal error")
 
+// HTTP Status
 const (
 	STATUS_CONTINUE                      = 100
 	STATUS_SWITCHING_PROTOCOL            = 101

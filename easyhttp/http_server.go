@@ -1,4 +1,4 @@
-package gohttp
+package easyhttp
 
 import (
 	"bufio"
@@ -12,25 +12,37 @@ import (
 	"time"
 )
 
+// Struct that represent a HTTP Server
 type HTTPServer struct {
+	// Server Address
 	address     string
 	listener    net.Listener
 	uriHandlers map[string]map[string]*responseHandler
 	running     bool
 	waitGroup   sync.WaitGroup
-	timeout     time.Duration
+	// Server Timeout
+	timeout time.Duration
 }
 
+// Function that sets server request timeout
 func (s *HTTPServer) SetTimeout(timeout_ms time.Duration) {
 	s.timeout = timeout_ms
 }
 
+// Function that responds to HTTP Requests
 type ResponseFunction func(ServerHTTPRequest, *ServerHTTPResponse)
+
+// Function that responds to HTTP Request Chunk
 type ServerChunkFunction func([]byte, ServerHTTPRequest, *ServerHTTPResponse) bool
+
+// Function that responds to HTTP Response Chunk on Client Requests
 type ClientChunkFunction func([]byte, *ClientHTTPResponse) bool
 
+// Additional Options for Handlers
 type HandlerOptions struct {
-	onChunk        ServerChunkFunction
+	// Function to run on every chunk if request is chunked
+	onChunk ServerChunkFunction
+	// Indicates if ResponseFunction should still run after all chunks are received
 	runAfterChunks bool
 }
 
@@ -40,6 +52,7 @@ type responseHandler struct {
 	options    HandlerOptions
 }
 
+// Response Function that responds to a request with the file indicated by fileName
 func FileServer(fileName string) ResponseFunction {
 	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
 		response.statusCode = STATUS_OK
@@ -47,6 +60,7 @@ func FileServer(fileName string) ResponseFunction {
 	}
 }
 
+// Response Function that responds to a request with the file indicated by filePrefix + lastPathElement
 func FileServerFromPath(filePrefix string) ResponseFunction {
 	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
 		response.statusCode = STATUS_OK
@@ -63,6 +77,7 @@ func FileServerFromPath(filePrefix string) ResponseFunction {
 	}
 }
 
+// Response Function that responds to a request with a perma redirect to given redirectURI
 func PermaRedirect(redirectURI string) ResponseFunction {
 	return func(request ServerHTTPRequest, response *ServerHTTPResponse) {
 		response.SetStatus(STATUS_MOVED_PERMANENTLY)
@@ -81,6 +96,7 @@ func (s *HTTPServer) addHandlerForMethod(handler *responseHandler, method string
 	}
 }
 
+// Add Handler for GET method to given uri pattern
 func (s *HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFunction) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -90,6 +106,7 @@ func (s *HTTPServer) HandleGET(uriPattern string, handlerFunction ResponseFuncti
 	s.addHandlerForMethod(handler, MethodGet)
 }
 
+// Add Handler for GET method to given uri pattern with additional options
 func (s *HTTPServer) HandleGETWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -99,6 +116,7 @@ func (s *HTTPServer) HandleGETWithOptions(uriPattern string, handlerFunction Res
 	s.addHandlerForMethod(handler, MethodGet)
 }
 
+// Add Handler for POST method to given uri pattern
 func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunction) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -108,6 +126,7 @@ func (s *HTTPServer) HandlePOST(uriPattern string, handlerFunction ResponseFunct
 	s.addHandlerForMethod(handler, MethodPost)
 }
 
+// Add Handler for POST method to given uri pattern with additional options
 func (s *HTTPServer) HandlePOSTWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -117,6 +136,7 @@ func (s *HTTPServer) HandlePOSTWithOptions(uriPattern string, handlerFunction Re
 	s.addHandlerForMethod(handler, MethodPost)
 }
 
+// Add Handler for PUT method to given uri pattern
 func (s *HTTPServer) HandlePUT(uriPattern string, handlerFunction ResponseFunction) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -126,6 +146,7 @@ func (s *HTTPServer) HandlePUT(uriPattern string, handlerFunction ResponseFuncti
 	s.addHandlerForMethod(handler, MethodPut)
 }
 
+// Add Handler for PUT method to given uri pattern with additional options
 func (s *HTTPServer) HandlePUTWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -135,6 +156,7 @@ func (s *HTTPServer) HandlePUTWithOptions(uriPattern string, handlerFunction Res
 	s.addHandlerForMethod(handler, MethodPut)
 }
 
+// Add Handler for DELETE method to given uri pattern
 func (s *HTTPServer) HandleDELETE(uriPattern string, handlerFunction ResponseFunction) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -144,6 +166,7 @@ func (s *HTTPServer) HandleDELETE(uriPattern string, handlerFunction ResponseFun
 	s.addHandlerForMethod(handler, MethodDelete)
 }
 
+// Add Handler for DELETE method to given uri pattern with additional options
 func (s *HTTPServer) HandleDELETEWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -153,6 +176,7 @@ func (s *HTTPServer) HandleDELETEWithOptions(uriPattern string, handlerFunction 
 	s.addHandlerForMethod(handler, MethodDelete)
 }
 
+// Add Handler for PATCH method to given uri pattern
 func (s *HTTPServer) HandlePATCH(uriPattern string, handlerFunction ResponseFunction) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -162,6 +186,7 @@ func (s *HTTPServer) HandlePATCH(uriPattern string, handlerFunction ResponseFunc
 	s.addHandlerForMethod(handler, MethodPatch)
 }
 
+// Add Handler for PATCH method to given uri pattern with additional options
 func (s *HTTPServer) HandlePATCHWithOptions(uriPattern string, handlerFunction ResponseFunction, options HandlerOptions) {
 	var handler *responseHandler = new(responseHandler)
 	handler.uriPattern = uriPattern
@@ -325,6 +350,7 @@ func (s *HTTPServer) acceptConnection() (net.Conn, error) {
 	return s.listener.Accept()
 }
 
+// Start listening to requests. This method blocks until server is closed
 func (s *HTTPServer) Run() {
 	s.running = true
 	for s.running {
@@ -337,6 +363,7 @@ func (s *HTTPServer) Run() {
 	}
 }
 
+// Gracefully shutdown server waiting for open connections to finish
 func (s *HTTPServer) GracefullShutdown() error {
 	s.running = false
 	err := s.listener.Close()
@@ -344,12 +371,14 @@ func (s *HTTPServer) GracefullShutdown() error {
 	return err
 }
 
+// Closes server immediatly
 func (s *HTTPServer) Close() error {
 	s.running = false
 	err := s.listener.Close()
 	return err
 }
 
+// Create a HTTP Server listening in address
 func NewHTTPServer(address string) (*HTTPServer, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -362,6 +391,7 @@ func NewHTTPServer(address string) (*HTTPServer, error) {
 	}, nil
 }
 
+// Create a HTTPS Server listening in address
 func NewTLSHTTPServer(address string, config *tls.Config) (*HTTPServer, error) {
 	listener, err := tls.Listen("tcp", address, config)
 	if err != nil {
