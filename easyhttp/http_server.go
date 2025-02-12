@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"log"
 	"net"
 	"net/textproto"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +20,7 @@ type HTTPServer struct {
 	address     string
 	listener    net.Listener
 	uriHandlers map[string]map[string]*responseHandler
+	patterns    []string
 	running     bool
 	waitGroup   sync.WaitGroup
 	// Server Timeout
@@ -86,6 +89,9 @@ func PermaRedirect(redirectURI string) ResponseFunction {
 }
 
 func (s *HTTPServer) addHandlerForMethod(handler *responseHandler, method string) {
+	if !slices.Contains(s.patterns, handler.uriPattern) {
+		s.patterns = append(s.patterns, handler.uriPattern)
+	}
 
 	if currentHandlers, exists := s.uriHandlers[handler.uriPattern]; exists {
 		currentHandlers[method] = handler
@@ -317,9 +323,10 @@ func getRequestHandler(server *HTTPServer, request *ServerHTTPRequest) (*respons
 		method = MethodGet
 	}
 	var matched = false
-	for uri, methodMap := range server.uriHandlers {
+	for _, uri := range server.patterns {
 		if isURIMatch(request.uri.Path, uri) {
 			matched = true
+			var methodMap = server.uriHandlers[uri]
 			if handler, ok := methodMap[method]; ok {
 				return handler, nil
 			}
@@ -353,6 +360,9 @@ func (s *HTTPServer) acceptConnection() (net.Conn, error) {
 // Start listening to requests. This method blocks until server is closed
 func (s *HTTPServer) Run() {
 	s.running = true
+	for key, value := range s.patterns {
+		log.Println(key, value)
+	}
 	for s.running {
 		connection, err := s.acceptConnection()
 		if err != nil {
@@ -388,6 +398,7 @@ func NewHTTPServer(address string) (*HTTPServer, error) {
 		address:     address,
 		listener:    listener,
 		uriHandlers: make(map[string]map[string]*responseHandler),
+		patterns:    make([]string, 0, 10),
 	}, nil
 }
 
@@ -401,5 +412,6 @@ func NewTLSHTTPServer(address string, config *tls.Config) (*HTTPServer, error) {
 		address:     address,
 		listener:    listener,
 		uriHandlers: make(map[string]map[string]*responseHandler),
+		patterns:    make([]string, 0, 10),
 	}, nil
 }
