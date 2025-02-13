@@ -137,14 +137,16 @@ func (r *ServerHTTPResponse) toBytes() ([]byte, error) {
 
 	addEssentialHTTPHeaders(r)
 
-	if !r.ExistsHeader("Content-Type") {
-		r.SetHeader("Content-Type", "text/plain")
-	}
-
 	if r.chunked {
 		r.SetHeader("Transfer-Encoding", "chunked")
 	} else if r.body != nil && r.body.Len() > 0 {
+		if !r.ExistsHeader("Content-Type") {
+			r.SetHeader("Content-Type", "text/plain")
+		}
 		r.SetHeader("Content-Length", strconv.Itoa(r.body.Len()))
+	} else {
+		r.SetHeader("Content-Length", "0")
+		r.SetHeader("Connection", "close")
 	}
 
 	for headerName, headerValue := range r.headers {
@@ -176,7 +178,7 @@ func (r *ServerHTTPResponse) toBytes() ([]byte, error) {
 	if contentLengthHeader != nil && !r.chunked {
 		contentLengthValue := contentLengthHeader[len(contentLengthHeader)-1]
 		bodyLength, err := strconv.ParseInt(contentLengthValue, 10, 32)
-		if err != nil || bodyLength == 0 {
+		if err != nil {
 			return nil, errors.New("content length not valid")
 		}
 

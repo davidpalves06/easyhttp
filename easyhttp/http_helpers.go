@@ -180,6 +180,10 @@ func isURIMatch(requestPath string, pattern string) bool {
 	requestParts = slices.DeleteFunc(requestParts, isEmpty)
 	patternParts = slices.DeleteFunc(patternParts, isEmpty)
 
+	if len(requestParts) == 0 {
+		requestParts = append(requestParts, "")
+	}
+
 	if len(requestParts) < len(patternParts) {
 		return false
 	}

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	"log"
 	"net"
 	"net/textproto"
 	"runtime"
@@ -360,9 +359,6 @@ func (s *HTTPServer) acceptConnection() (net.Conn, error) {
 // Start listening to requests. This method blocks until server is closed
 func (s *HTTPServer) Run() {
 	s.running = true
-	for key, value := range s.patterns {
-		log.Println(key, value)
-	}
 	for s.running {
 		connection, err := s.acceptConnection()
 		if err != nil {
