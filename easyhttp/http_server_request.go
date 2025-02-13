@@ -98,6 +98,32 @@ func (r *ServerHTTPRequest) Chunked() {
 	r.chunked = true
 }
 
+func (r *ServerHTTPRequest) ParseForm() (map[string]string, error) {
+	if !r.HasHeaderValue("Content-Type", "application/x-www-form-urlencoded") {
+		return nil, errors.New("content type is not application/x-www-form-urlencoded")
+	}
+	var values = make(map[string]string)
+	formString := string(r.Body)
+	splittedForm := strings.Split(formString, "&")
+
+	for _, entry := range splittedForm {
+		var splittedEntry = strings.Split(entry, "=")
+		if len(splittedEntry) != 2 {
+			return nil, errors.New("incorrect entry")
+		}
+		key, err := url.QueryUnescape(splittedEntry[0])
+		if err != nil {
+			return nil, err
+		}
+		value, err := url.QueryUnescape(splittedEntry[1])
+		if err != nil {
+			return nil, err
+		}
+		values[key] = value
+	}
+	return values, nil
+}
+
 func parseRequestLine(requestLine string, request *ServerHTTPRequest) error {
 	var requestLineSplit = strings.Split(requestLine, " ")
 	if len(requestLineSplit) != 3 {
