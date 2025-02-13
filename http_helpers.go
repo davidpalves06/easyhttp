@@ -184,6 +184,10 @@ func isURIMatch(requestPath string, pattern string) bool {
 		requestParts = append(requestParts, "")
 	}
 
+	if len(patternParts) == 0 {
+		patternParts = append(patternParts, "")
+	}
+
 	if len(requestParts) < len(patternParts) {
 		return false
 	}

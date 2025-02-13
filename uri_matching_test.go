@@ -11,6 +11,7 @@ type UriMatchTest struct {
 var uriMatchTests = []UriMatchTest{
 	{requestPath: "/path", pattern: "/*", expectedResult: true},
 	{requestPath: "/", pattern: "*", expectedResult: true},
+	{requestPath: "/", pattern: "/", expectedResult: true},
 	{requestPath: "/path", pattern: "/", expectedResult: false},
 	{requestPath: "/path", pattern: "/path/resource", expectedResult: false},
 	{requestPath: "/path/resource", pattern: "/*", expectedResult: true},
