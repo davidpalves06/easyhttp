@@ -33,6 +33,7 @@ var mime_types = map[string]string{
 	"js":   "application/javascript",
 	"json": "application/json",
 	"pdf":  "application/pdf",
+	"xml":  "application/xml",
 	"jpg":  "image/jpeg",
 	"png":  "image/png",
 	"gif":  "image/gif",
